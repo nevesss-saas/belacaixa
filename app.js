@@ -27,6 +27,8 @@ let state = null;          // carregado da nuvem após login
 let sb = null;             // cliente Supabase
 let currentUser = null;    // usuária logada
 let demoMode = false;      // demonstração navegável (sem login, sem nuvem)
+const ADMIN_EMAIL = 'celula.ruach18@gmail.com';   // dono que vê o painel admin
+const isAdmin = () => !demoMode && !!currentUser && (currentUser.email || '').toLowerCase() === ADMIN_EMAIL;
 
 /* ============================================================
    NUVEM (Supabase) — auth + persistência isolada por tenant
@@ -697,6 +699,72 @@ VIEWS.assistente = {
   }
 };
 
+/* ---------- ADMIN (painel do dono) ---------- */
+VIEWS.admin = {
+  title: '👑 Painel do Dono', subtitle: 'Visão geral de todos os clientes do sistema',
+  html() {
+    return `<div id="adminRoot"><div class="empty"><span class="e-ico">⏳</span>Carregando dados do sistema…</div></div>`;
+  },
+  init() { loadAdminStats(); }
+};
+const PLAN_LABEL = { silver_mensal: 'Silver mensal', silver_anual: 'Silver anual', gold_mensal: 'Gold mensal', gold_anual: 'Gold anual' };
+function statusBadge(s, active) {
+  if (s === 'pix') return '<span class="adm-badge b-pix">Pix (conferir)</span>';
+  if (s === 'sem assinatura') return '<span class="adm-badge b-none">Sem assinatura</span>';
+  if (active) return '<span class="adm-badge b-on">Ativa</span>';
+  return `<span class="adm-badge b-off">${esc(s || 'inativa')}</span>`;
+}
+function adminHTML(d) {
+  const planos = Object.entries(d.byPlan || {}).map(([k, n]) => `${PLAN_LABEL[k] || k}: <b>${n}</b>`).join(' · ') || '—';
+  const rows = (d.clients || []).map(c => {
+    const venc = c.current_period_end ? fmtDateFull(c.current_period_end.slice(0, 10)) : '—';
+    return `<tr>
+      <td>${esc(c.email)}</td>
+      <td>${PLAN_LABEL[c.plan] || (c.plan === '—' ? '—' : esc(c.plan))}</td>
+      <td>${statusBadge(c.status, c.active)}</td>
+      <td>${venc}</td>
+    </tr>`;
+  }).join('');
+  return `
+    <div class="grid cols-4">
+      ${kpi('👥', 'Usuários cadastrados', d.totalUsers, '', 'linear-gradient(135deg,#3b82f6,#06b6d4)')}
+      ${kpi('✅', 'Assinaturas ativas', d.activeCount, '', '#e2f8f1', '#00b389')}
+      ${kpi('💳', 'Cartão · 📲 Pix', d.cardCount + ' · ' + d.pixCount, '', '#f3e8ff', '#9b5de5')}
+      ${kpi('💰', 'Receita mensal (MRR)', fmt(d.mrr), `<span class="kpi-delta">≈ ${fmt(d.arr)}/ano</span>`, 'linear-gradient(135deg,#f43f8e,#9b5de5)')}
+    </div>
+    <div class="card mt">
+      <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div><b>Distribuição por plano:</b> ${planos}</div>
+        <button class="btn btn-soft btn-sm" data-act="admin-refresh">🔄 Atualizar</button>
+      </div>
+    </div>
+    <div class="card mt adm-tablewrap">
+      <table class="adm-table">
+        <thead><tr><th>Cliente (e-mail)</th><th>Plano</th><th>Status</th><th>Vence/renova</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:var(--muted)">Nenhum cliente ainda.</td></tr>'}</tbody>
+      </table>
+    </div>
+    <p class="adm-foot">⚠️ Pagamentos no <b>Pix</b> são liberados na confiança — confira os comprovantes que chegam no seu WhatsApp. Atualizado em ${new Date(d.generatedAt).toLocaleString('pt-BR')}.</p>`;
+}
+async function loadAdminStats() {
+  const root = $('#adminRoot'); if (!root) return;
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(window.BELACAIXA_CFG.url + '/functions/v1/admin-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, apikey: window.BELACAIXA_CFG.anon },
+      body: JSON.stringify({})
+    });
+    const j = await res.json();
+    if (!res.ok) { root.innerHTML = `<div class="empty"><span class="e-ico">🔒</span>${esc(j.error || 'Sem acesso a esta área.')}</div>`; return; }
+    root.innerHTML = adminHTML(j);
+    const rb = root.querySelector('[data-act="admin-refresh"]');
+    if (rb) rb.onclick = () => { root.innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Atualizando…</div>'; loadAdminStats(); };
+  } catch (e) {
+    root.innerHTML = '<div class="empty"><span class="e-ico">⚠️</span>Erro ao carregar os dados. Tente novamente.</div>';
+  }
+}
+
 /* ============================================================
    RENDER / ROUTER
    ============================================================ */
@@ -1085,6 +1153,7 @@ async function enterApp() {
   if (!hasAccess()) { showSubGate(); return; }
   const em = $('#sbUserEmail'); if (em) em.textContent = currentUser.email;
   updatePlanChip();
+  const adm = $('#navAdmin'); if (adm) adm.hidden = !isAdmin();
   render(); window.scrollTo(0, 0);
 }
 function exitApp() { $('#app').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#landing').hidden = false; document.body.style.background = ''; window.scrollTo(0, 0); }

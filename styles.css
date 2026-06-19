@@ -356,6 +356,21 @@ textarea{resize:vertical;min-height:70px}
 #demoBar .demo-x{flex:0 0 auto;width:30px;height:30px;border-radius:9px;color:#fff;background:rgba(255,255,255,.12);font-size:15px;line-height:1}
 #demoBar .demo-x:hover{background:rgba(255,255,255,.22)}
 
+/* ---------- PAINEL DO DONO (admin) ---------- */
+.nav-admin{margin-top:6px;background:linear-gradient(135deg,rgba(244,63,142,.12),rgba(155,93,229,.12));border:1px solid rgba(155,93,229,.35);border-radius:12px;font-weight:600}
+.adm-tablewrap{padding:0;overflow-x:auto}
+.adm-table{width:100%;min-width:540px;border-collapse:collapse;font-size:14px}
+.adm-table thead th{text-align:left;padding:14px 18px;background:var(--bg);color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--line)}
+.adm-table tbody td{padding:13px 18px;border-bottom:1px solid var(--line)}
+.adm-table tbody tr:last-child td{border-bottom:0}
+.adm-table tbody tr:hover{background:var(--bg)}
+.adm-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.adm-badge.b-on{background:#e2f8f1;color:#00875f}
+.adm-badge.b-pix{background:#fff4e0;color:#b06f00}
+.adm-badge.b-off{background:#fde7ec;color:#c2334f}
+.adm-badge.b-none{background:#eef0f4;color:#7a8294}
+.adm-foot{margin-top:14px;font-size:12.5px;color:var(--muted);line-height:1.5}
+
 /* ============================================================
    RESPONSIVE
    ============================================================ */
