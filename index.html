@@ -162,6 +162,12 @@
 
   <!-- ====================== APP ====================== -->
   <div id="app" hidden>
+    <div id="demoBar" hidden>
+      <span class="demo-dot"></span>
+      <span class="demo-txt"><b>Você está na demonstração</b> — dados de exemplo. Explore as categorias à vontade; nada é salvo.</span>
+      <button type="button" class="btn btn-primary btn-sm" data-demo-signup>Criar minha conta grátis</button>
+      <button type="button" class="demo-x" data-demo-exit aria-label="Sair da demonstração">✕</button>
+    </div>
     <aside class="sidebar">
       <div class="sb-brand">
         <span class="logo-mark">B</span>
@@ -304,6 +310,9 @@
           <button class="btn btn-primary btn-block" id="auSubmit" type="submit">Entrar</button>
         </form>
         <p class="auth-alt"><span data-auth-tab-text>Ainda não tem conta?</span> <a href="#" id="auSwitch">Criar conta</a></p>
+        <div class="auth-or"><span>ou</span></div>
+        <button type="button" class="btn btn-soft btn-block auth-demo" data-demo>👀 Ver demonstração — sem cadastro</button>
+        <p class="auth-demo-note">Explore o painel com dados de exemplo e veja como cada parte funciona.</p>
         <button type="button" class="btn btn-ghost btn-sm auth-back" data-auth-back>← Voltar ao site</button>
       </div>
       <p class="auth-foot">🔒 Seus dados ficam isolados e seguros na nuvem.</p>

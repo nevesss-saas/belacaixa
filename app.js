@@ -26,6 +26,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 let state = null;          // carregado da nuvem após login
 let sb = null;             // cliente Supabase
 let currentUser = null;    // usuária logada
+let demoMode = false;      // demonstração navegável (sem login, sem nuvem)
 
 /* ============================================================
    NUVEM (Supabase) — auth + persistência isolada por tenant
@@ -45,6 +46,7 @@ async function cloudLoad() {
 }
 function save() { cloudSaveNow(); }   // mesma assinatura usada no app inteiro (fire-and-forget)
 async function cloudSaveNow() {
+  if (demoMode) return;                        // demonstração nunca persiste na nuvem
   if (!sb || !currentUser || !state) return;
   state.updatedAt = Date.now();
   try { await sb.from('tenant_state').upsert({ user_id: currentUser.id, data: state, updated_at: new Date().toISOString() }); }
@@ -962,6 +964,7 @@ async function onAuthSubmit(e) {
   }
 }
 async function logout() {
+  if (demoMode) { exitDemo(); return; }
   try { await sb.auth.signOut(); } catch (e) {}
   currentUser = null; state = null;
   $('#app').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#landing').hidden = false;
@@ -1086,9 +1089,34 @@ async function enterApp() {
 }
 function exitApp() { $('#app').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#landing').hidden = false; document.body.style.background = ''; window.scrollTo(0, 0); }
 
+/* ---------------- DEMONSTRAÇÃO (sem login, sem nuvem) ---------------- */
+function enterDemo() {
+  demoMode = true;
+  state = seed();                              // dados de exemplo completos, em memória
+  currentView = 'dashboard';
+  $('#landing').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#app').hidden = false;
+  document.body.style.background = 'var(--bg)';
+  const chip = $('#sbPlanChip'); if (chip) chip.textContent = 'DEMONSTRAÇÃO';
+  const em = $('#sbUserEmail'); if (em) em.textContent = 'Modo demonstração · dados de exemplo';
+  const bar = $('#demoBar'); if (bar) bar.hidden = false;
+  render(); window.scrollTo(0, 0);
+}
+function exitDemo() {
+  demoMode = false; state = null;
+  const bar = $('#demoBar'); if (bar) bar.hidden = true;
+  exitApp();
+}
+function demoSignup() {
+  demoMode = false; state = null;
+  const bar = $('#demoBar'); if (bar) bar.hidden = true;
+  showAuth('signup');
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   $$('[data-enter]').forEach(b => b.onclick = () => enterApp());
-  $$('[data-demo]').forEach(b => b.onclick = () => enterApp());
+  $$('[data-demo]').forEach(b => b.onclick = () => enterDemo());
+  $$('[data-demo-signup]').forEach(b => b.onclick = () => demoSignup());
+  $$('[data-demo-exit]').forEach(b => b.onclick = () => exitDemo());
   $('#navMenu').addEventListener('click', e => { const b = e.target.closest('.nav-item'); if (b) setView(b.dataset.view); });
   $('[data-exit]').onclick = exitApp;
   $$('[data-logout]').forEach(b => b.onclick = logout);
