@@ -178,8 +178,11 @@
       </nav>
       <div class="sb-plan">
         <span class="plan-chip">Plano SILVER</span>
-        <p>Seu MVP está ativo ✨</p>
-        <button class="btn btn-ghost btn-sm" data-exit>← Voltar ao site</button>
+        <p id="sbUserEmail">Seu MVP está ativo ✨</p>
+        <div class="row" style="gap:8px">
+          <button class="btn btn-ghost btn-sm" data-exit>← Site</button>
+          <button class="btn btn-ghost btn-sm" data-logout>Sair</button>
+        </div>
       </div>
     </aside>
 
@@ -200,11 +203,45 @@
     </main>
   </div>
 
+  <!-- ====================== AUTH ====================== -->
+  <div id="authScreen" hidden>
+    <div class="auth-wrap">
+      <div class="auth-card card">
+        <div class="auth-brand"><span class="logo-mark">B</span><span class="logo-text">Bela<b>Caixa</b></span></div>
+        <div class="seg auth-tabs">
+          <button type="button" class="on" data-auth-tab="login">Entrar</button>
+          <button type="button" data-auth-tab="signup">Criar conta</button>
+        </div>
+        <form id="authForm" novalidate>
+          <div class="field" data-only="signup" hidden>
+            <label>Nome do seu negócio</label>
+            <input class="input" id="auBiz" placeholder="Ex.: Studio Bella Unhas" autocomplete="organization"/>
+          </div>
+          <div class="field">
+            <label>Email</label>
+            <input class="input" id="auEmail" type="email" placeholder="voce@email.com" autocomplete="email"/>
+          </div>
+          <div class="field">
+            <label>Senha</label>
+            <input class="input" id="auPass" type="password" placeholder="mínimo 6 caracteres" autocomplete="current-password"/>
+          </div>
+          <p class="auth-err" id="auErr" hidden></p>
+          <button class="btn btn-primary btn-block" id="auSubmit" type="submit">Entrar</button>
+        </form>
+        <p class="auth-alt"><span data-auth-tab-text>Ainda não tem conta?</span> <a href="#" id="auSwitch">Criar conta</a></p>
+        <button type="button" class="btn btn-ghost btn-sm auth-back" data-auth-back>← Voltar ao site</button>
+      </div>
+      <p class="auth-foot">🔒 Seus dados ficam isolados e seguros na nuvem.</p>
+    </div>
+  </div>
+
   <!-- Modal host -->
   <div id="modalRoot"></div>
   <!-- Toast host -->
   <div id="toastRoot"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

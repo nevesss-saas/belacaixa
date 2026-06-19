@@ -23,19 +23,44 @@ const avColor = s => AVCOLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % 
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-let state = load();
+let state = null;          // carregado da nuvem após login
+let sb = null;             // cliente Supabase
+let currentUser = null;    // usuária logada
 
 /* ============================================================
-   SEED
+   NUVEM (Supabase) — auth + persistência isolada por tenant
    ============================================================ */
-function load() {
-  try { const s = JSON.parse(localStorage.getItem(STORE)); if (s && s.v === 1) return s; } catch (e) {}
-  const fresh = seed();
-  try { localStorage.setItem(STORE, JSON.stringify(fresh)); } catch (e) {}
-  return fresh;
+function initSb() {
+  const c = window.BELACAIXA_CFG || {};
+  if (!window.supabase || !c.url || !c.anon) { console.warn('Supabase indisponível'); return false; }
+  sb = window.supabase.createClient(c.url, c.anon, { auth: { persistSession: true, autoRefreshToken: true } });
+  return true;
 }
-function save() { localStorage.setItem(STORE, JSON.stringify(state)); }
+async function cloudLoad() {
+  if (!sb || !currentUser) return;
+  const { data: row, error } = await sb.from('tenant_state').select('data').eq('user_id', currentUser.id).maybeSingle();
+  if (error) { console.error(error); toast('Não consegui carregar seus dados.', 'warn'); }
+  if (row && row.data && row.data.v === 1) state = row.data;
+  else { state = starterState(); await cloudSaveNow(); }
+}
+function save() { cloudSaveNow(); }   // mesma assinatura usada no app inteiro (fire-and-forget)
+async function cloudSaveNow() {
+  if (!sb || !currentUser || !state) return;
+  state.updatedAt = Date.now();
+  try { await sb.from('tenant_state').upsert({ user_id: currentUser.id, data: state, updated_at: new Date().toISOString() }); }
+  catch (e) { console.error('save error', e); }
+}
+// estado inicial de uma conta nova: modelos prontos, dados operacionais zerados
+function starterState() {
+  const s = seed();
+  s.clients = []; s.transactions = []; s.appointments = []; s.assets = []; s.chat = [];
+  s.business.name = 'Meu Negócio';
+  return s;
+}
 
+/* ============================================================
+   SEED (dados de demonstração)
+   ============================================================ */
 function seed() {
   const now = new Date();
   const inv = [
@@ -836,7 +861,7 @@ function modalBiz() {
     b.name = $('#g_name').value.trim() || b.name; b.reserveTarget = +$('#g_res').value || b.reserveTarget; b.monthlyGoal = +$('#g_goal').value || b.monthlyGoal;
     save(); closeModal(); render(); toast('Configurações salvas.', 'ok');
   };
-  $('#g_reset').onclick = () => { if (confirm('Isso apaga seus dados e restaura a demonstração. Continuar?')) { localStorage.removeItem(STORE); state = seed(); save(); closeModal(); render(); toast('Dados de demonstração restaurados.', 'info'); } };
+  $('#g_reset').onclick = () => { if (confirm('Isso substitui seus dados pelos de demonstração. Continuar?')) { state = seed(); save(); closeModal(); render(); toast('Dados de demonstração carregados.', 'info'); } };
 }
 
 /* ============================================================
@@ -873,16 +898,93 @@ document.addEventListener('click', e => {
 });
 
 /* ============================================================
+   AUTENTICAÇÃO (tela de login / cadastro)
+   ============================================================ */
+let authMode = 'login';
+function showAuth(mode) {
+  setAuthMode(mode || 'login');
+  $('#landing').hidden = true; $('#app').hidden = true; $('#authScreen').hidden = false;
+  $('#auErr').hidden = true; document.body.style.background = '';
+  window.scrollTo(0, 0);
+}
+function setAuthMode(mode) {
+  authMode = mode;
+  $$('#authScreen [data-auth-tab]').forEach(b => b.classList.toggle('on', b.dataset.authTab === mode));
+  $$('#authScreen [data-only="signup"]').forEach(el => el.hidden = (mode !== 'signup'));
+  $('#auSubmit').textContent = mode === 'signup' ? 'Criar minha conta' : 'Entrar';
+  $('[data-auth-tab-text]').textContent = mode === 'signup' ? 'Já tem conta?' : 'Ainda não tem conta?';
+  $('#auSwitch').textContent = mode === 'signup' ? 'Entrar' : 'Criar conta';
+}
+function authErr(m) { const e = $('#auErr'); e.textContent = m; e.hidden = false; }
+function traduzErro(m) {
+  m = (m || '').toLowerCase();
+  if (m.includes('invalid login')) return 'Email ou senha incorretos.';
+  if (m.includes('already')) return 'Esse email já tem conta. Tente entrar.';
+  if (m.includes('password')) return 'Senha inválida (mínimo 6 caracteres).';
+  if (m.includes('email')) return 'Email inválido.';
+  if (m.includes('fetch') || m.includes('network')) return 'Sem conexão com a internet.';
+  return 'Não consegui completar. Tente novamente.';
+}
+function wireAuth() {
+  $$('#authScreen [data-auth-tab]').forEach(b => b.onclick = () => setAuthMode(b.dataset.authTab));
+  $('#auSwitch').onclick = e => { e.preventDefault(); setAuthMode(authMode === 'signup' ? 'login' : 'signup'); };
+  $$('[data-auth-back]').forEach(b => b.onclick = () => exitApp());
+  $('#authForm').addEventListener('submit', onAuthSubmit);
+}
+async function onAuthSubmit(e) {
+  e.preventDefault();
+  if (!sb) return authErr('Serviço indisponível (sem internet?).');
+  const email = $('#auEmail').value.trim(), pass = $('#auPass').value, biz = $('#auBiz').value.trim();
+  if (!email || !pass) return authErr('Preencha email e senha.');
+  if (pass.length < 6) return authErr('A senha precisa ter ao menos 6 caracteres.');
+  const btn = $('#auSubmit'); btn.disabled = true; const old = btn.textContent; btn.textContent = 'Aguarde…';
+  try {
+    if (authMode === 'signup') {
+      const { data, error } = await sb.auth.signUp({ email, password: pass, options: { data: { business_name: biz || 'Meu Negócio' } } });
+      if (error) throw error;
+      if (!data.session) { const r = await sb.auth.signInWithPassword({ email, password: pass }); if (r.error) throw r.error; currentUser = r.data.user; }
+      else currentUser = data.user;
+      await cloudLoad();
+      if (biz && state) { state.business.name = biz; save(); }
+    } else {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+      if (error) throw error;
+      currentUser = data.user;
+    }
+    await enterApp();
+  } catch (err) {
+    authErr(traduzErro(err && err.message));
+  } finally {
+    btn.disabled = false; btn.textContent = old;
+  }
+}
+async function logout() {
+  try { await sb.auth.signOut(); } catch (e) {}
+  currentUser = null; state = null;
+  $('#app').hidden = true; $('#authScreen').hidden = true; $('#landing').hidden = false;
+  document.body.style.background = ''; window.scrollTo(0, 0);
+  toast('Você saiu da conta.', 'info');
+}
+
+/* ============================================================
    BOOT
    ============================================================ */
-function enterApp() { $('#landing').hidden = true; $('#app').hidden = false; document.body.style.background = 'var(--bg)'; render(); window.scrollTo(0, 0); }
-function exitApp() { $('#app').hidden = true; $('#landing').hidden = false; window.scrollTo(0, 0); }
+async function enterApp() {
+  if (!currentUser) { showAuth('login'); return; }
+  $('#landing').hidden = true; $('#authScreen').hidden = true; $('#app').hidden = false;
+  document.body.style.background = 'var(--bg)';
+  if (!state) { $('#viewRoot').innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Carregando seus dados…</div>'; await cloudLoad(); }
+  const em = $('#sbUserEmail'); if (em) em.textContent = currentUser.email;
+  render(); window.scrollTo(0, 0);
+}
+function exitApp() { $('#app').hidden = true; $('#authScreen').hidden = true; $('#landing').hidden = false; document.body.style.background = ''; window.scrollTo(0, 0); }
 
-document.addEventListener('DOMContentLoaded', () => {
-  $$('[data-enter]').forEach(b => b.onclick = enterApp);
-  $$('[data-demo]').forEach(b => b.onclick = enterApp);
+document.addEventListener('DOMContentLoaded', async () => {
+  $$('[data-enter]').forEach(b => b.onclick = () => enterApp());
+  $$('[data-demo]').forEach(b => b.onclick = () => enterApp());
   $('#navMenu').addEventListener('click', e => { const b = e.target.closest('.nav-item'); if (b) setView(b.dataset.view); });
   $('[data-exit]').onclick = exitApp;
+  $$('[data-logout]').forEach(b => b.onclick = logout);
   $('#hamburger').onclick = () => $('.sidebar').classList.toggle('open');
   $('#bizPill').onclick = modalBiz;
   const billToggle = $('#billToggle');
@@ -894,4 +996,12 @@ document.addEventListener('DOMContentLoaded', () => {
     $$('.amt-ano, .note-ano').forEach(x => x.hidden = !ano);
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  wireAuth();
+  // já existe sessão salva?
+  if (initSb()) {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) { currentUser = session.user; await enterApp(); }
+    } catch (e) { console.error(e); }
+  }
 });
