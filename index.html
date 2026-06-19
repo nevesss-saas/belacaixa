@@ -111,24 +111,20 @@
 
     <section id="planos" class="lp-section">
       <h2 class="lp-h2">Planos de assinatura</h2>
-      <p class="lp-sub">Comece grátis no MVP. Planos anuais quando estiver pronta pra escalar.</p>
+      <p class="lp-sub">Escolha pagar por mês ou no ano e economize. Sem fidelidade — cancele quando quiser.</p>
+      <div class="bill-toggle" id="billToggle">
+        <button type="button" class="bt on" data-bill="mes">Mensal</button>
+        <button type="button" class="bt" data-bill="ano">Anual <span class="save-pill">2 meses grátis</span></button>
+      </div>
       <div class="plans">
-        <div class="plan">
-          <h3>Iniciante</h3>
-          <div class="price">Grátis</div>
-          <p class="plan-tag">Para testar tudo agora</p>
-          <ul>
-            <li>✔ Fluxo de caixa completo</li>
-            <li>✔ Cadastro de clientes</li>
-            <li>✔ Agenda de atendimentos</li>
-            <li>✔ Controle de estoque</li>
-          </ul>
-          <button class="btn btn-outline" data-enter>Começar grátis</button>
-        </div>
         <div class="plan featured">
           <span class="plan-badge">Mais popular</span>
           <h3>SILVER</h3>
-          <div class="price"><span>R$</span>490<small>/ano</small></div>
+          <div class="price">
+            <div class="amt amt-mes"><span>R$</span>49<small>,90 /mês</small></div>
+            <div class="amt amt-ano" hidden><span>R$</span>490<small> /ano</small></div>
+          </div>
+          <p class="bill-note"><span class="note-mes">Cobrado mensalmente</span><span class="note-ano" hidden>Cobrado 1× ao ano · economize ~18%</span></p>
           <p class="plan-tag">Para o salão que quer crescer</p>
           <ul>
             <li>✔ Tudo do Iniciante</li>
@@ -141,7 +137,11 @@
         </div>
         <div class="plan">
           <h3>GOLD</h3>
-          <div class="price"><span>R$</span>949<small>/ano</small></div>
+          <div class="price">
+            <div class="amt amt-mes"><span>R$</span>99<small>,90 /mês</small></div>
+            <div class="amt amt-ano" hidden><span>R$</span>949<small> /ano</small></div>
+          </div>
+          <p class="bill-note"><span class="note-mes">Cobrado mensalmente</span><span class="note-ano" hidden>Cobrado 1× ao ano · economize ~21%</span></p>
           <p class="plan-tag">Para mais de uma unidade</p>
           <ul>
             <li>✔ Tudo do SILVER</li>

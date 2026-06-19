@@ -885,5 +885,13 @@ document.addEventListener('DOMContentLoaded', () => {
   $('[data-exit]').onclick = exitApp;
   $('#hamburger').onclick = () => $('.sidebar').classList.toggle('open');
   $('#bizPill').onclick = modalBiz;
+  const billToggle = $('#billToggle');
+  if (billToggle) billToggle.addEventListener('click', e => {
+    const b = e.target.closest('.bt'); if (!b) return;
+    const ano = b.dataset.bill === 'ano';
+    $$('#billToggle .bt').forEach(x => x.classList.toggle('on', x === b));
+    $$('.amt-mes, .note-mes').forEach(x => x.hidden = ano);
+    $$('.amt-ano, .note-ano').forEach(x => x.hidden = !ano);
+  });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 });
