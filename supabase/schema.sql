@@ -41,3 +41,25 @@ create policy ts_upd on public.tenant_state
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy ts_del on public.tenant_state
   for delete using (auth.uid() = user_id);
+
+-- ============================================================
+-- ASSINATURAS (status vindo do Stripe via webhook)
+-- A usuária só LÊ a própria; quem ESCREVE é o webhook (service_role,
+-- que ignora RLS). Por isso não há policy de insert/update p/ usuária.
+-- ============================================================
+create table if not exists public.subscriptions (
+  user_id                 uuid primary key references auth.users(id) on delete cascade,
+  status                  text not null default 'inactive',  -- active|trialing|past_due|canceled|inactive
+  plan                    text,                              -- ex.: silver_mensal
+  stripe_customer_id      text,
+  stripe_subscription_id  text,
+  current_period_end      timestamptz,
+  updated_at              timestamptz not null default now()
+);
+create index if not exists idx_subs_stripe_sub  on public.subscriptions(stripe_subscription_id);
+create index if not exists idx_subs_stripe_cust on public.subscriptions(stripe_customer_id);
+
+alter table public.subscriptions enable row level security;
+drop policy if exists subs_sel on public.subscriptions;
+create policy subs_sel on public.subscriptions
+  for select using (auth.uid() = user_id);

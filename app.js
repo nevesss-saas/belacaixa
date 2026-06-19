@@ -961,9 +961,57 @@ async function onAuthSubmit(e) {
 async function logout() {
   try { await sb.auth.signOut(); } catch (e) {}
   currentUser = null; state = null;
-  $('#app').hidden = true; $('#authScreen').hidden = true; $('#landing').hidden = false;
+  $('#app').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#landing').hidden = false;
   document.body.style.background = ''; window.scrollTo(0, 0);
   toast('Você saiu da conta.', 'info');
+}
+
+/* ============================================================
+   ASSINATURA (Stripe) — trava de acesso (sem teste grátis)
+   ============================================================ */
+let subInfo = null;
+let subBilling = 'mes';
+async function loadSubscription() {
+  if (!sb || !currentUser) { subInfo = null; return; }
+  const { data } = await sb.from('subscriptions').select('status,plan,current_period_end').eq('user_id', currentUser.id).maybeSingle();
+  subInfo = data || { status: 'inactive' };
+}
+function subActive() { return !!(subInfo && (subInfo.status === 'active' || subInfo.status === 'trialing')); }
+function hasAccess() { return subActive(); }
+async function pollSub(n) { for (let i = 0; i < n; i++) { await new Promise(r => setTimeout(r, 1500)); await loadSubscription(); if (subActive()) return; } }
+function updatePlanChip() { const c = $('#sbPlanChip'); if (!c) return; c.textContent = subActive() ? ('Plano ' + (subInfo.plan ? subInfo.plan.split('_')[0].toUpperCase() : 'ativo')) : 'Sem plano'; }
+function showSubGate() {
+  $('#landing').hidden = true; $('#authScreen').hidden = true; $('#app').hidden = true; $('#subScreen').hidden = false;
+  document.body.style.background = '';
+  const msg = $('#subTrialMsg'); if (msg) msg.textContent = (currentUser ? currentUser.email + ' · ' : '') + 'Assine um plano para acessar o painel.';
+  window.scrollTo(0, 0);
+}
+function wireSub() {
+  const t = $('#subBillToggle');
+  if (t) t.addEventListener('click', e => {
+    const b = e.target.closest('.bt'); if (!b) return;
+    subBilling = b.dataset.bill;
+    $$('#subBillToggle .bt').forEach(x => x.classList.toggle('on', x === b));
+    const ano = subBilling === 'ano';
+    $$('#subScreen .amt-mes').forEach(x => x.hidden = ano);
+    $$('#subScreen .amt-ano').forEach(x => x.hidden = !ano);
+  });
+  $$('#subScreen [data-sub]').forEach(b => b.onclick = () => startCheckout(subBilling === 'ano' ? b.dataset.subAno : b.dataset.sub, b));
+}
+async function startCheckout(plan, btn) {
+  try {
+    if (btn) { btn.disabled = true; btn.dataset.old = btn.textContent; btn.textContent = 'Abrindo pagamento…'; }
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(window.BELACAIXA_CFG.url + '/functions/v1/create-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, apikey: window.BELACAIXA_CFG.anon },
+      body: JSON.stringify({ plan, returnTo: location.origin + location.pathname })
+    });
+    const j = await res.json();
+    if (j.url) { location.href = j.url; return; }
+    toast('Não consegui iniciar o pagamento. ' + (j.error || ''), 'warn');
+  } catch (e) { toast('Erro ao iniciar pagamento.', 'warn'); }
+  if (btn) { btn.disabled = false; if (btn.dataset.old) btn.textContent = btn.dataset.old; }
 }
 
 /* ============================================================
@@ -971,13 +1019,19 @@ async function logout() {
    ============================================================ */
 async function enterApp() {
   if (!currentUser) { showAuth('login'); return; }
-  $('#landing').hidden = true; $('#authScreen').hidden = true; $('#app').hidden = false;
+  $('#landing').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#app').hidden = false;
   document.body.style.background = 'var(--bg)';
   if (!state) { $('#viewRoot').innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Carregando seus dados…</div>'; await cloudLoad(); }
+  await loadSubscription();
+  const params = new URLSearchParams(location.search);
+  if (params.get('assinatura') === 'sucesso' && !subActive()) { $('#viewRoot').innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Confirmando seu pagamento…</div>'; await pollSub(8); }
+  if (params.get('assinatura')) { const ok = params.get('assinatura') === 'sucesso' && subActive(); history.replaceState({}, '', location.pathname); if (ok) toast('Assinatura ativada! 🎉', 'ok'); }
+  if (!hasAccess()) { showSubGate(); return; }
   const em = $('#sbUserEmail'); if (em) em.textContent = currentUser.email;
+  updatePlanChip();
   render(); window.scrollTo(0, 0);
 }
-function exitApp() { $('#app').hidden = true; $('#authScreen').hidden = true; $('#landing').hidden = false; document.body.style.background = ''; window.scrollTo(0, 0); }
+function exitApp() { $('#app').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#landing').hidden = false; document.body.style.background = ''; window.scrollTo(0, 0); }
 
 document.addEventListener('DOMContentLoaded', async () => {
   $$('[data-enter]').forEach(b => b.onclick = () => enterApp());
@@ -997,6 +1051,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
   wireAuth();
+  wireSub();
   // já existe sessão salva?
   if (initSb()) {
     try {

@@ -177,7 +177,7 @@
         <button class="nav-item" data-view="assistente"><span class="ni-ico">🤖</span> Assistente IA</button>
       </nav>
       <div class="sb-plan">
-        <span class="plan-chip">Plano SILVER</span>
+        <span class="plan-chip" id="sbPlanChip">Plano</span>
         <p id="sbUserEmail">Seu MVP está ativo ✨</p>
         <div class="row" style="gap:8px">
           <button class="btn btn-ghost btn-sm" data-exit>← Site</button>
@@ -201,6 +201,56 @@
 
       <div class="view-wrap" id="viewRoot"><!-- views render here --></div>
     </main>
+  </div>
+
+  <!-- ====================== ASSINATURA (trava) ====================== -->
+  <div id="subScreen" hidden>
+    <div class="sub-wrap">
+      <div class="sub-head">
+        <div class="auth-brand"><span class="logo-mark">B</span><span class="logo-text">Bela<b>Caixa</b></span></div>
+        <h2>Escolha seu plano para continuar</h2>
+        <p id="subTrialMsg" class="muted"></p>
+      </div>
+      <div class="bill-toggle" id="subBillToggle">
+        <button type="button" class="bt on" data-bill="mes">Mensal</button>
+        <button type="button" data-bill="ano">Anual <span class="save-pill">2 meses grátis</span></button>
+      </div>
+      <div class="plans sub-plans">
+        <div class="plan featured">
+          <span class="plan-badge">Mais popular</span>
+          <h3>SILVER</h3>
+          <div class="price">
+            <div class="amt amt-mes"><span>R$</span>49<small>,90 /mês</small></div>
+            <div class="amt amt-ano" hidden><span>R$</span>490<small> /ano</small></div>
+          </div>
+          <ul>
+            <li>✔ Fluxo de caixa, clientes, agenda e estoque</li>
+            <li>✔ IA de compras e promoções</li>
+            <li>✔ Sugestões de investimento</li>
+            <li>✔ Assistente inteligente</li>
+          </ul>
+          <button class="btn btn-primary btn-block" data-sub="silver_mensal" data-sub-ano="silver_anual">Assinar SILVER</button>
+        </div>
+        <div class="plan">
+          <h3>GOLD</h3>
+          <div class="price">
+            <div class="amt amt-mes"><span>R$</span>99<small>,90 /mês</small></div>
+            <div class="amt amt-ano" hidden><span>R$</span>949<small> /ano</small></div>
+          </div>
+          <ul>
+            <li>✔ Tudo do SILVER</li>
+            <li>✔ Multi-unidades</li>
+            <li>✔ Metas e projeções</li>
+            <li>✔ Suporte prioritário</li>
+          </ul>
+          <button class="btn btn-outline btn-block" data-sub="gold_mensal" data-sub-ano="gold_anual">Assinar GOLD</button>
+        </div>
+      </div>
+      <div class="sub-foot">
+        <span class="muted">🔒 Pagamento seguro via Stripe · cancele quando quiser</span>
+        <button type="button" class="btn btn-ghost btn-sm" data-logout>Sair</button>
+      </div>
+    </div>
   </div>
 
   <!-- ====================== AUTH ====================== -->
