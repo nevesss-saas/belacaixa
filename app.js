@@ -1150,10 +1150,11 @@ async function enterApp() {
   const params = new URLSearchParams(location.search);
   if (params.get('assinatura') === 'sucesso' && !subActive()) { $('#viewRoot').innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Confirmando seu pagamento…</div>'; await pollSub(8); }
   if (params.get('assinatura')) { const ok = params.get('assinatura') === 'sucesso' && subActive(); history.replaceState({}, '', location.pathname); if (ok) toast('Assinatura ativada! 🎉', 'ok'); }
-  if (!hasAccess()) { showSubGate(); return; }
+  if (!hasAccess() && !isAdmin()) { showSubGate(); return; }   // o dono entra sem pagar
   const em = $('#sbUserEmail'); if (em) em.textContent = currentUser.email;
   updatePlanChip();
   const adm = $('#navAdmin'); if (adm) adm.hidden = !isAdmin();
+  if (isAdmin()) { const chip = $('#sbPlanChip'); if (chip) chip.textContent = '👑 DONO'; }
   render(); window.scrollTo(0, 0);
 }
 function exitApp() { $('#app').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#landing').hidden = false; document.body.style.background = ''; window.scrollTo(0, 0); }
