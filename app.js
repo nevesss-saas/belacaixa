@@ -703,6 +703,8 @@ function render() {
   $('#viewTitle').textContent = v.title;
   $('#viewSubtitle').textContent = v.subtitle;
   $('#viewRoot').innerHTML = v.html();
+  const _vb = (typeof vencBannerHTML === 'function') ? vencBannerHTML() : '';
+  if (_vb) $('#viewRoot').insertAdjacentHTML('afterbegin', _vb);
   v.init && v.init();
   $$('#navMenu .nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === currentView));
   $('#bizName').textContent = state.business.name;
@@ -878,6 +880,7 @@ const ACTIONS = {
   'gerar-pedido': modalPedido,
   'go-estoque': () => setView('estoque'),
   'go-patrimonio': () => setView('patrimonio'),
+  'assinar': () => showSubGate(),
   'repor-item': (id) => modalRepor(id),
   'comprar-promo': (id) => { const m = state.market.find(x => x.id === id); if (m) modalRepor(m.itemId); },
   'done-appt': (id) => {
@@ -976,15 +979,58 @@ async function loadSubscription() {
   const { data } = await sb.from('subscriptions').select('status,plan,current_period_end').eq('user_id', currentUser.id).maybeSingle();
   subInfo = data || { status: 'inactive' };
 }
-function subActive() { return !!(subInfo && (subInfo.status === 'active' || subInfo.status === 'trialing')); }
+function accessNotExpired() {
+  if (!subInfo) return false;
+  if (subInfo.stripe_subscription_id) return true;       // cartão recorrente: status manda
+  if (subInfo.current_period_end) return new Date(subInfo.current_period_end).getTime() > Date.now(); // pix/avulso: vence
+  return true;
+}
+function subActive() { return !!(subInfo && ['active', 'trialing', 'pix'].includes(subInfo.status) && accessNotExpired()); }
 function hasAccess() { return subActive(); }
+function vencInfo() {
+  if (!subInfo || !subInfo.current_period_end) return null;
+  const end = new Date(subInfo.current_period_end);
+  return { end, days: Math.ceil((end.getTime() - Date.now()) / 86400000), recorrente: !!subInfo.stripe_subscription_id };
+}
+function vencBannerHTML() {
+  if (!hasAccess()) return '';
+  const v = vencInfo(); if (!v) return '';
+  const tone = v.days <= 5 ? 'amber' : 'violet';
+  const verbo = v.recorrente ? 'Renova automaticamente em' : 'Seu acesso vence em';
+  const acao = (!v.recorrente && v.days <= 10) ? '<button class="btn btn-soft btn-sm" data-act="assinar" style="margin-left:auto">Renovar</button>' : '';
+  return `<div class="venc-bar tone-${tone}"><span>⏳ ${verbo} <b>${v.days} dia(s)</b> · ${v.end.toLocaleDateString('pt-BR')}</span>${acao}</div>`;
+}
 async function pollSub(n) { for (let i = 0; i < n; i++) { await new Promise(r => setTimeout(r, 1500)); await loadSubscription(); if (subActive()) return; } }
-function updatePlanChip() { const c = $('#sbPlanChip'); if (!c) return; c.textContent = subActive() ? ('Plano ' + (subInfo.plan ? subInfo.plan.split('_')[0].toUpperCase() : 'ativo')) : 'Sem plano'; }
+function updatePlanChip() { const c = $('#sbPlanChip'); if (!c) return; if (hasAccess()) { const tier = subInfo.plan ? subInfo.plan.split('_')[0].toUpperCase() : 'ativo'; c.textContent = 'Plano ' + tier + (subInfo.status === 'pix' ? ' · Pix' : ''); } else c.textContent = 'Sem plano'; }
 function showSubGate() {
   $('#landing').hidden = true; $('#authScreen').hidden = true; $('#app').hidden = true; $('#subScreen').hidden = false;
   document.body.style.background = '';
   const msg = $('#subTrialMsg'); if (msg) msg.textContent = (currentUser ? currentUser.email + ' · ' : '') + 'Assine um plano para acessar o painel.';
   window.scrollTo(0, 0);
+}
+let pixTier = 'silver';
+const PIX_VAL = { silver_mensal: 'R$ 49,90', silver_anual: 'R$ 490,00', gold_mensal: 'R$ 99,90', gold_anual: 'R$ 949,00' };
+function currentPixPlan() { return pixTier + '_' + (subBilling === 'ano' ? 'anual' : 'mensal'); }
+function updatePixAmount() {
+  const p = currentPixPlan();
+  const v = $('#pixValor'), per = $('#pixPeriodo');
+  if (v) v.textContent = PIX_VAL[p];
+  if (per) per.textContent = subBilling === 'ano' ? '/ano (à vista)' : '/mês';
+}
+async function pixClaim() {
+  const btn = $('#pixDone'); if (btn) { btn.disabled = true; btn.dataset.old = btn.textContent; btn.textContent = 'Liberando…'; }
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(window.BELACAIXA_CFG.url + '/functions/v1/pix-claim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, apikey: window.BELACAIXA_CFG.anon },
+      body: JSON.stringify({ plan: currentPixPlan() })
+    });
+    const j = await res.json();
+    if (j.ok) { toast('Acesso liberado via Pix! 🎉', 'ok'); await loadSubscription(); await enterApp(); return; }
+    toast('Não consegui liberar. ' + (j.error || ''), 'warn');
+  } catch (e) { toast('Erro ao liberar acesso.', 'warn'); }
+  if (btn) { btn.disabled = false; if (btn.dataset.old) btn.textContent = btn.dataset.old; }
 }
 function wireSub() {
   const t = $('#subBillToggle');
@@ -995,8 +1041,15 @@ function wireSub() {
     const ano = subBilling === 'ano';
     $$('#subScreen .amt-mes').forEach(x => x.hidden = ano);
     $$('#subScreen .amt-ano').forEach(x => x.hidden = !ano);
+    updatePixAmount();
   });
   $$('#subScreen [data-sub]').forEach(b => b.onclick = () => startCheckout(subBilling === 'ano' ? b.dataset.subAno : b.dataset.sub, b));
+  const pt = $('#pixToggleBtn');
+  if (pt) pt.onclick = () => { const p = $('#pixPanel'); if (p) { p.hidden = !p.hidden; if (!p.hidden) updatePixAmount(); } };
+  $$('#pixPanel [data-pix-tier]').forEach(b => b.onclick = () => { pixTier = b.dataset.pixTier; $$('#pixPanel [data-pix-tier]').forEach(x => x.classList.toggle('on', x === b)); updatePixAmount(); });
+  const pc = $('#pixCopy');
+  if (pc) pc.onclick = async () => { try { await navigator.clipboard.writeText('67.136.444/0001-20'); toast('Chave Pix copiada!', 'ok'); } catch (e) { toast('Copie a chave: 67.136.444/0001-20', 'info'); } };
+  const pd = $('#pixDone'); if (pd) pd.onclick = pixClaim;
 }
 async function startCheckout(plan, btn) {
   try {

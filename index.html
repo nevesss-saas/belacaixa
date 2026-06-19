@@ -213,7 +213,7 @@
       </div>
       <div class="bill-toggle" id="subBillToggle">
         <button type="button" class="bt on" data-bill="mes">Mensal</button>
-        <button type="button" data-bill="ano">Anual <span class="save-pill">2 meses grátis</span></button>
+        <button type="button" class="bt" data-bill="ano">Anual <span class="save-pill">2 meses grátis</span></button>
       </div>
       <div class="plans sub-plans">
         <div class="plan featured">
@@ -246,8 +246,33 @@
           <button class="btn btn-outline btn-block" data-sub="gold_mensal" data-sub-ano="gold_anual">Assinar GOLD</button>
         </div>
       </div>
+      <div class="pix-bar">
+        <button type="button" class="pix-bar-btn" id="pixToggleBtn">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="5.7" y="5.7" width="12.6" height="12.6" rx="3" transform="rotate(45 12 12)" fill="#32BCAD"/></svg>
+          Prefere pagar no <b>Pix</b>? Toque aqui
+          <span class="pix-chevron">▾</span>
+        </button>
+        <div class="pix-panel" id="pixPanel" hidden>
+          <div class="pix-head">
+            <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><rect x="5.7" y="5.7" width="12.6" height="12.6" rx="3.4" transform="rotate(45 12 12)" fill="#32BCAD"/></svg>
+            <div><b>Pagar com Pix</b><div class="muted">Liberação na hora após confirmar</div></div>
+          </div>
+          <div class="seg pix-tier">
+            <button type="button" class="on" data-pix-tier="silver">SILVER</button>
+            <button type="button" data-pix-tier="gold">GOLD</button>
+          </div>
+          <div class="pix-amount">Valor do Pix: <b id="pixValor">R$ 49,90</b> <span class="muted" id="pixPeriodo">/mês</span></div>
+          <div class="pix-key">
+            <div style="min-width:0"><span class="muted">Chave Pix (CNPJ)</span><div class="pix-key-val" id="pixKey">67.136.444/0001-20</div></div>
+            <button type="button" class="btn btn-soft btn-sm" id="pixCopy">Copiar</button>
+          </div>
+          <div class="pix-name"><span class="muted">Recebedor:</span> <b>EMT TECNOLOGIA LTDA</b></div>
+          <p class="pix-steps"><b>1.</b> Faça o Pix do valor acima para a chave. &nbsp; <b>2.</b> Clique em “Já fiz o Pix” para liberar seu acesso.</p>
+          <button type="button" class="btn btn-primary btn-block" id="pixDone">✓ Já fiz o Pix</button>
+        </div>
+      </div>
       <div class="sub-foot">
-        <span class="muted">🔒 Pagamento seguro via Stripe · cancele quando quiser</span>
+        <span class="muted">🔒 Cartão (Stripe) ou Pix · cancele quando quiser</span>
         <button type="button" class="btn btn-ghost btn-sm" data-logout>Sair</button>
       </div>
     </div>
