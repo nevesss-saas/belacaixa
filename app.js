@@ -577,12 +577,33 @@ VIEWS.agenda = {
       </div>`).join('') : `<div class="card mt"><div class="empty"><span class="e-ico">📭</span>Nenhum atendimento agendado. Que tal divulgar seus horários?</div></div>`}`;
   }
 };
+function waPhone(raw) {
+  let d = String(raw || '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.length <= 11 && !d.startsWith('55')) d = '55' + d;   // adiciona DDI do Brasil
+  return d;
+}
+function waLink(phone, text) {
+  return 'https://wa.me/' + waPhone(phone) + '?text=' + encodeURIComponent(text);
+}
 function apptRow(a) {
-  return `<div class="row between" style="padding:12px 0;border-bottom:1px dashed var(--line)">
+  const cli = (state.clients || []).find(c => c.id === a.clientId);
+  const phone = cli && cli.phone ? cli.phone : '';
+  const first = (a.clientName || '').split(' ')[0];
+  const biz = (state.business && state.business.name) || 'nosso espaço';
+  const dataBR = a.date.split('-').reverse().join('/');
+  const msgConfirmar = `Oi ${first}! 💅 Passando pra confirmar seu horário na ${biz}: ${a.serviceName} no dia ${dataBR} às ${a.time}. Posso confirmar? 😊`;
+  const msgLembrar = `Oi ${first}! 💜 Lembrete do seu horário na ${biz}: ${a.serviceName} dia ${dataBR} às ${a.time}. Te espero! ✨`;
+  const noTel = phone ? '' : ' title="Cliente sem telefone — o WhatsApp vai abrir pra você escolher o contato"';
+  return `<div class="row between appt-row" style="padding:12px 0;border-bottom:1px dashed var(--line)">
     <div class="row" style="gap:12px"><span class="cli-av" style="background:${avColor(a.clientName)}">${initials(a.clientName)}</span>
-      <div><b>${a.time}</b> · ${esc(a.clientName)}<div class="muted" style="font-size:13px">${esc(a.serviceName)} · ${fmt(a.price)}</div></div></div>
-    <div class="row"><button class="btn btn-soft btn-sm" data-act="done-appt" data-id="${a.id}">✓ Concluir</button>
-      <button class="modal-x" data-act="del-appt" data-id="${a.id}" title="Cancelar">×</button></div></div>`;
+      <div><b>${a.time}</b> · ${esc(a.clientName)}${phone ? '' : ' <span class="tag-cat" style="background:#fff1dc;color:#b9770f">sem tel.</span>'}<div class="muted" style="font-size:13px">${esc(a.serviceName)} · ${fmt(a.price)}</div></div></div>
+    <div class="row appt-acts">
+      <a class="btn btn-sm btn-wa" href="${waLink(phone, msgConfirmar)}" target="_blank" rel="noopener"${noTel}>✅ Confirmar</a>
+      <a class="btn btn-sm btn-wa-soft" href="${waLink(phone, msgLembrar)}" target="_blank" rel="noopener"${noTel}>🔔 Lembrar</a>
+      <button class="btn btn-soft btn-sm" data-act="done-appt" data-id="${a.id}">✓ Concluir</button>
+      <button class="modal-x" data-act="del-appt" data-id="${a.id}" title="Cancelar">×</button>
+    </div></div>`;
 }
 function suggestSlot() {
   const slots = ['09:00', '10:30', '13:00', '14:30', '16:00', '17:30'];

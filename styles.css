@@ -442,6 +442,14 @@ textarea{resize:vertical;min-height:70px}
 .svc-price{font-family:var(--display);font-weight:800;font-size:18px;color:var(--violet);white-space:nowrap}
 .svc-actions{display:flex;gap:6px;flex:0 0 auto}
 
+/* ---- botões WhatsApp na agenda ---- */
+.appt-acts{gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.btn-wa{background:#25d366;color:#fff;text-decoration:none}
+.btn-wa:hover{background:#1eb457;color:#fff}
+.btn-wa-soft{background:#e7f9ee;color:#0a8f5b;text-decoration:none}
+.btn-wa-soft:hover{background:#d3f3e0;color:#0a8f5b}
+@media(max-width:560px){.appt-row{flex-direction:column;align-items:flex-start;gap:10px}.appt-acts{justify-content:flex-start}}
+
 /* ============================================================
    RESPONSIVE
    ============================================================ */
