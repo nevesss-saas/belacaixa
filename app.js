@@ -708,46 +708,71 @@ VIEWS.admin = {
   init() { loadAdminStats(); }
 };
 const PLAN_LABEL = { silver_mensal: 'Silver mensal', silver_anual: 'Silver anual', gold_mensal: 'Gold mensal', gold_anual: 'Gold anual' };
-function statusBadge(s, active) {
-  if (s === 'pix') return '<span class="adm-badge b-pix">Pix (validado)</span>';
-  if (s === 'sem assinatura') return '<span class="adm-badge b-none">Sem assinatura</span>';
-  if (active) return '<span class="adm-badge b-on">Ativa</span>';
-  return `<span class="adm-badge b-off">${esc(s || 'inativa')}</span>`;
+const PLAN_OPTS = ['silver_mensal', 'silver_anual', 'gold_mensal', 'gold_anual'];
+function planChipAdm(plan) {
+  if (!plan || plan === '—') return '<span class="pchip pchip-none">Sem plano</span>';
+  const tier = String(plan).split('_')[0];
+  return `<span class="pchip pchip-${tier}">${PLAN_LABEL[plan] || esc(plan)}</span>`;
+}
+function vencChip(c) {
+  if (!c.current_period_end) return '';
+  const end = new Date(c.current_period_end);
+  const days = Math.ceil((end.getTime() - Date.now()) / 86400000);
+  return `<span class="pipe-venc ${days <= 5 ? 'venc-soon' : ''}">⏳ ${days > 0 ? days + 'd' : 'vencido'} · ${end.toLocaleDateString('pt-BR')}</span>`;
+}
+function statusDot(c) {
+  const s = c.active ? 'on' : (c.status === 'canceled' ? 'off' : 'idle');
+  return `<span class="sdot sdot-${s}"></span>`;
+}
+function pipeCard(c, kind) {
+  const nome = esc(c.business_name || c.email || '—');
+  const da = `data-uid="${esc(c.user_id || '')}" data-email="${esc(c.email || '')}" data-plan="${esc(c.plan || '')}" data-nome="${nome}"`;
+  const ib = (act, cls, ico, title) => `<button class="ib ${cls}" data-cli-action="${act}" ${da} title="${title}" aria-label="${title}">${ico}</button>`;
+  let actions;
+  if (kind === 'active') {
+    actions = ib('edit', 'ib-edit', '✏️', 'Editar plano/validade') + ib('revoke', 'ib-danger', '🚫', 'Revogar acesso');
+  } else {
+    const canDel = c.status && c.status !== 'sem assinatura';
+    actions = ib('activate', 'ib-ok', '✅', 'Liberar acesso') + ib('edit', 'ib-edit', '✏️', 'Editar') + (canDel ? ib('delete', 'ib-ghost', '🗑️', 'Excluir assinatura') : '');
+  }
+  return `<div class="pipe-card">
+    <div class="pipe-card-top"><b>${nome}</b>${statusDot(c)}</div>
+    <div class="pipe-card-mail">${esc(c.email || '')}</div>
+    <div class="pipe-card-meta">${planChipAdm(c.plan)} ${vencChip(c)}</div>
+    <div class="pipe-actions">${actions}</div>
+  </div>`;
+}
+function pixCard(p) {
+  return `<div class="pipe-card pipe-card-pix">
+    <div class="pipe-card-top"><b>${esc(p.business_name || '—')}</b><span class="tkt">${esc(p.ticket_code || '')}</span></div>
+    <div class="pipe-card-mail">${esc(p.email || '')}</div>
+    <div class="pipe-card-meta">${planChipAdm(p.plan)} <span class="pipe-venc">${p.amount_cents != null ? fmt(p.amount_cents / 100) : ''} · ${new Date(p.created_at).toLocaleDateString('pt-BR')}</span></div>
+    <div class="pipe-actions">
+      <button class="ib ib-ok" data-pix-approve="${esc(p.id)}" title="Liberar acesso (comprovante conferido)">✓</button>
+      <button class="ib ib-danger" data-pix-reject="${esc(p.id)}" title="Recusar ticket">✕</button>
+    </div>
+  </div>`;
+}
+function pipeCol(icon, title, cls, cards, emptyMsg) {
+  return `<div class="pipe-col ${cls}">
+    <div class="pipe-col-head"><span class="pipe-col-ic">${icon}</span><span class="pipe-col-t">${title}</span><span class="pipe-col-n">${cards.length}</span></div>
+    <div class="pipe-col-body">${cards.length ? cards.join('') : `<div class="pipe-empty">${emptyMsg}</div>`}</div>
+  </div>`;
 }
 function adminHTML(d) {
   const planos = Object.entries(d.byPlan || {}).map(([k, n]) => `${PLAN_LABEL[k] || k}: <b>${n}</b>`).join(' · ') || '—';
-  const rows = (d.clients || []).map(c => {
-    const venc = c.current_period_end ? fmtDateFull(c.current_period_end.slice(0, 10)) : '—';
-    return `<tr>
-      <td>${esc(c.email)}</td>
-      <td>${PLAN_LABEL[c.plan] || (c.plan === '—' ? '—' : esc(c.plan))}</td>
-      <td>${statusBadge(c.status, c.active)}</td>
-      <td>${venc}</td>
-    </tr>`;
-  }).join('');
+  const clients = d.clients || [];
   const pend = d.pixPending || [];
-  const pendRows = pend.map(p => `<tr>
-      <td><b>${esc(p.ticket_code || '—')}</b></td>
-      <td>${esc(p.business_name || '—')}</td>
-      <td>${esc(p.email || '—')}</td>
-      <td>${PLAN_LABEL[p.plan] || esc(p.plan || '—')}</td>
-      <td>${p.amount_cents != null ? fmt(p.amount_cents / 100) : '—'}</td>
-      <td>${new Date(p.created_at).toLocaleString('pt-BR')}</td>
-      <td class="num" style="white-space:nowrap">
-        <button class="btn btn-primary btn-sm" data-pix-approve="${esc(p.id)}">✓ Liberar</button>
-        <button class="btn btn-ghost btn-sm" data-pix-reject="${esc(p.id)}">Recusar</button>
-      </td></tr>`).join('');
-  const pendCard = pend.length ? `
-    <div class="card mt adm-pend">
-      <h3 class="adm-pend-title">🎟️ Pix aguardando você validar <span class="adm-pend-badge">${pend.length}</span></h3>
-      <p class="muted" style="margin:0 0 12px">Confira no seu WhatsApp o comprovante que o cliente enviou e libere o acesso.</p>
-      <div class="adm-tablewrap">
-        <table class="adm-table">
-          <thead><tr><th>Ticket</th><th>Empresa</th><th>E-mail</th><th>Plano</th><th>Valor</th><th>Data do pedido</th><th></th></tr></thead>
-          <tbody>${pendRows}</tbody>
-        </table>
-      </div>
-    </div>` : '';
+  const trial = clients.filter(c => c.stage === 'trial');
+  const active = clients.filter(c => c.stage === 'active');
+  const inactive = clients.filter(c => c.stage === 'inactive');
+  const board = `
+    <div class="pipe">
+      ${pipeCol('🎟️', 'Pix a validar', 'col-pix', pend.map(pixCard), 'Nenhum Pix aguardando')}
+      ${pipeCol('🎁', 'Em teste (24h)', 'col-trial', trial.map(c => pipeCard(c, 'trial')), 'Ninguém em teste')}
+      ${pipeCol('✅', 'Ativos', 'col-active', active.map(c => pipeCard(c, 'active')), 'Nenhum ativo ainda')}
+      ${pipeCol('⛔', 'Inativos', 'col-inactive', inactive.map(c => pipeCard(c, 'inactive')), 'Ninguém inativo')}
+    </div>`;
   return `
     <div class="grid cols-4">
       ${kpi('👥', 'Usuários cadastrados', d.totalUsers, '', 'linear-gradient(135deg,#3b82f6,#06b6d4)')}
@@ -761,14 +786,10 @@ function adminHTML(d) {
         <button class="btn btn-soft btn-sm" data-act="admin-refresh">🔄 Atualizar</button>
       </div>
     </div>
-    ${pendCard}
-    <div class="card mt adm-tablewrap">
-      <table class="adm-table">
-        <thead><tr><th>Cliente (e-mail)</th><th>Plano</th><th>Status</th><th>Vence/renova</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:var(--muted)">Nenhum cliente ainda.</td></tr>'}</tbody>
-      </table>
-    </div>
-    <p class="adm-foot">💡 Pagamentos no <b>Pix</b> só liberam depois que você valida o comprovante no ticket acima. Cartão libera sozinho. Atualizado em ${new Date(d.generatedAt).toLocaleString('pt-BR')}.</p>`;
+    <div class="pipe-head"><h3 class="pipe-title">📊 Pipeline de clientes</h3>
+      <span class="pipe-legend">✓ liberar Pix · ✅ ativar · ✏️ editar · 🚫 revogar · 🗑️ excluir</span></div>
+    ${board}
+    <p class="adm-foot">💡 Pix só libera depois que você confere o comprovante no WhatsApp e clica em <b>✓</b>. Cartão libera sozinho. Atualizado em ${new Date(d.generatedAt).toLocaleString('pt-BR')}.</p>`;
 }
 async function loadAdminStats() {
   const root = $('#adminRoot'); if (!root) return;
@@ -784,8 +805,14 @@ async function loadAdminStats() {
     root.innerHTML = adminHTML(j);
     const rb = root.querySelector('[data-act="admin-refresh"]');
     if (rb) rb.onclick = () => { root.innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Atualizando…</div>'; loadAdminStats(); };
-    root.querySelectorAll('[data-pix-approve]').forEach(b => b.onclick = () => { b.disabled = true; b.textContent = 'Liberando…'; approvePix(b.dataset.pixApprove, 'approve'); });
+    root.querySelectorAll('[data-pix-approve]').forEach(b => b.onclick = () => { b.disabled = true; b.textContent = '…'; approvePix(b.dataset.pixApprove, 'approve'); });
     root.querySelectorAll('[data-pix-reject]').forEach(b => b.onclick = () => { if (confirm('Recusar este ticket de Pix? O cliente não terá acesso.')) { b.disabled = true; approvePix(b.dataset.pixReject, 'reject'); } });
+    root.querySelectorAll('[data-cli-action]').forEach(b => b.onclick = () => {
+      const uid = b.dataset.uid, email = b.dataset.email, plan = b.dataset.plan, nome = b.dataset.nome, act = b.dataset.cliAction;
+      if (act === 'revoke') { if (confirm('Revogar o acesso de ' + (nome || email) + '? Ele perde o acesso na hora.')) adminAction(uid, 'revoke'); }
+      else if (act === 'delete') { if (confirm('Excluir a assinatura de ' + (nome || email) + '? (a conta continua, só zera a assinatura)')) adminAction(uid, 'delete'); }
+      else modalEditClient(uid, email, plan, nome, act);
+    });
   } catch (e) {
     root.innerHTML = '<div class="empty"><span class="e-ico">⚠️</span>Erro ao carregar os dados. Tente novamente.</div>';
   }
@@ -803,6 +830,45 @@ async function approvePix(id, action) {
     else { toast('Não consegui processar. ' + (j.error || ''), 'warn'); }
   } catch (e) { toast('Erro ao processar o ticket.', 'warn'); }
   loadAdminStats();
+}
+async function adminAction(uid, action, extra) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(window.BELACAIXA_CFG.url + '/functions/v1/admin-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, apikey: window.BELACAIXA_CFG.anon },
+      body: JSON.stringify({ user_id: uid, action, ...(extra || {}) })
+    });
+    const j = await res.json();
+    if (j.ok) {
+      toast(action === 'revoke' ? 'Acesso revogado.' : action === 'delete' ? 'Assinatura excluída.' : 'Acesso liberado! 🎉', 'ok');
+      loadAdminStats();
+      return true;
+    }
+    toast('Não consegui. ' + (j.error || ''), 'warn');
+  } catch (e) { toast('Erro na ação.', 'warn'); }
+  return false;
+}
+function modalEditClient(uid, email, plan, nome, mode) {
+  const cur = PLAN_OPTS.includes(plan) ? plan : 'silver_mensal';
+  const title = (mode === 'activate' ? '✅ Liberar acesso' : '✏️ Editar acesso');
+  openModal(title + (nome ? ' — ' + esc(nome) : ''), `
+    <p class="muted" style="margin:-4px 0 12px">${esc(email || '')}</p>
+    <div class="field"><label>Plano</label><select id="ad_plan">
+      ${PLAN_OPTS.map(p => `<option value="${p}" ${p === cur ? 'selected' : ''}>${PLAN_LABEL[p]}</option>`).join('')}
+    </select></div>
+    <div class="field"><label>Liberar acesso por (dias a partir de hoje)</label><input class="input" id="ad_days" type="number" min="1" value="${cur.endsWith('_anual') ? 365 : 30}"/></div>
+    <p class="muted" style="font-size:12.5px">Acesso manual (tipo Pix), com vencimento. Dá pra editar ou revogar depois.</p>
+  `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="ad_save">💾 Salvar acesso</button>`);
+  const ps = $('#ad_plan'), ds = $('#ad_days');
+  if (ps) ps.onchange = () => { if (ds) ds.value = ps.value.endsWith('_anual') ? 365 : 30; };
+  $('#ad_save').onclick = async () => {
+    const p = $('#ad_plan').value; const days = parseInt($('#ad_days').value, 10);
+    if (!(days > 0)) return toast('Informe uma quantidade de dias válida.', 'warn');
+    $('#ad_save').disabled = true;
+    const ok = await adminAction(uid, 'activate', { plan: p, days });
+    if (ok) closeModal();
+  };
 }
 
 /* ============================================================
