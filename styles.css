@@ -432,6 +432,16 @@ textarea{resize:vertical;min-height:70px}
 .ib-ghost{background:#f0eef4;color:var(--ink-2)}
 .ib-ghost:hover{background:#e6e2ee}
 
+/* ---- serviços ---- */
+.svc-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:16px}
+.svc-card{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 4px 14px -11px rgba(20,10,40,.4);transition:.15s}
+.svc-card:hover{box-shadow:0 9px 22px -12px rgba(20,10,40,.45);transform:translateY(-1px)}
+.svc-info{flex:1;min-width:0}
+.svc-name{font-weight:700;font-size:15px;word-break:break-word}
+.svc-meta{font-size:12px;color:var(--ink-3);margin-top:2px}
+.svc-price{font-family:var(--display);font-weight:800;font-size:18px;color:var(--violet);white-space:nowrap}
+.svc-actions{display:flex;gap:6px;flex:0 0 auto}
+
 /* ============================================================
    RESPONSIVE
    ============================================================ */

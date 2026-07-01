@@ -699,6 +699,32 @@ VIEWS.assistente = {
   }
 };
 
+/* ---------- SERVIÇOS ---------- */
+VIEWS.servicos = {
+  title: 'Serviços', subtitle: 'Cadastre seus serviços e ajuste os preços quando quiser',
+  html() {
+    const list = state.services || [];
+    const cards = list.map(s => `
+      <div class="svc-card">
+        <div class="svc-info">
+          <div class="svc-name">${esc(s.name)}</div>
+          <div class="svc-meta">${s.dur ? `⏱️ ${s.dur} min` : 'Sem duração definida'}</div>
+        </div>
+        <div class="svc-price">${fmt(s.price)}</div>
+        <div class="svc-actions">
+          <button class="ib ib-edit" data-act="edit-servico" data-id="${s.id}" title="Editar serviço">✏️</button>
+          <button class="ib ib-ghost" data-act="del-servico" data-id="${s.id}" title="Excluir serviço">🗑️</button>
+        </div>
+      </div>`).join('');
+    return `
+      <div class="section-head">
+        <div><h2>Seus serviços</h2><span class="sh-sub">${list.length} serviço(s) cadastrado(s)</span></div>
+        <button class="btn btn-primary" data-act="new-servico">＋ Adicionar serviço</button>
+      </div>
+      <div class="svc-list">${cards || '<div class="empty"><span class="e-ico">💅</span>Nenhum serviço ainda. Clique em “Adicionar serviço” pra começar.</div>'}</div>`;
+  }
+};
+
 /* ---------- ADMIN (painel do dono) ---------- */
 VIEWS.admin = {
   title: '👑 Painel do Dono', subtitle: 'Visão geral de todos os clientes do sistema',
@@ -914,7 +940,28 @@ function modalAtendimento() {
   };
 }
 function deduct(service) {
-  service.mat.forEach(([id, q]) => { const it = state.inventory.find(i => i.id === id); if (it) it.qty = Math.max(0, +(it.qty - q).toFixed(2)); });
+  (service.mat || []).forEach(([id, q]) => { const it = state.inventory.find(i => i.id === id); if (it) it.qty = Math.max(0, +(it.qty - q).toFixed(2)); });
+}
+function modalServico(id) {
+  const s = id ? state.services.find(x => x.id === id) : null;
+  openModal(s ? '✏️ Editar serviço' : '💅 Novo serviço', `
+    <div class="field"><label>Nome do serviço</label><input class="input" id="sv_name" placeholder="Ex.: Alongamento em gel" value="${s ? esc(s.name) : ''}"/></div>
+    <div class="field-row">
+      <div class="field"><label>Valor (R$)</label><input class="input" id="sv_price" type="number" step="0.01" min="0" value="${s ? s.price : ''}" placeholder="0,00"/></div>
+      <div class="field"><label>Duração (min)</label><input class="input" id="sv_dur" type="number" min="0" step="5" value="${s && s.dur ? s.dur : ''}" placeholder="60"/></div>
+    </div>
+    <p class="muted" style="font-size:12.5px">💡 Você pode editar o valor quando quiser, depois.</p>
+  `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="sv_save">${s ? 'Salvar' : 'Adicionar'}</button>`);
+  $('#sv_save').onclick = () => {
+    const name = $('#sv_name').value.trim();
+    const price = parseFloat($('#sv_price').value);
+    const dur = parseInt($('#sv_dur').value, 10);
+    if (!name) return toast('Informe o nome do serviço.', 'warn');
+    if (!(price >= 0)) return toast('Informe um valor válido.', 'warn');
+    if (s) { s.name = name; s.price = price; s.dur = dur > 0 ? dur : (s.dur || 0); }
+    else { state.services.push({ id: 's_' + uid(), name, price, dur: dur > 0 ? dur : 60, mat: [] }); }
+    save(); closeModal(); render(); toast(s ? 'Serviço atualizado ✨' : 'Serviço adicionado 💅', 'ok');
+  };
 }
 function modalTx(type) {
   const cats = type === 'in' ? ['Atendimentos', 'Venda de produtos', 'Outros'] : ['Matéria-prima', 'Aluguel', 'Energia / Água', 'Marketing', 'Salários / Comissão', 'Manutenção', 'Outros'];
@@ -1051,6 +1098,9 @@ const ACTIONS = {
   'new-saida': () => modalTx('out'),
   'new-cliente': modalCliente,
   'new-agenda': () => modalAgenda(),
+  'new-servico': () => modalServico(),
+  'edit-servico': (id) => modalServico(id),
+  'del-servico': (id) => { if (confirm('Excluir este serviço?')) { state.services = state.services.filter(s => s.id !== id); save(); render(); toast('Serviço removido.', 'info'); } },
   'new-item': modalItem,
   'new-asset': modalAsset,
   'gerar-pedido': modalPedido,
