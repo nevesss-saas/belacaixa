@@ -336,7 +336,15 @@ textarea{resize:vertical;min-height:70px}
 .pix-key{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f0fbf9;border:1px solid #cdeee8;border-radius:12px;padding:12px 14px}
 .pix-key-val{font-family:var(--display);font-weight:700;font-size:17px;letter-spacing:.01em;word-break:break-all}
 .pix-name{font-size:14px;margin:12px 0}
-.pix-steps{font-size:13px;color:var(--ink-2);background:#faf6f9;border-radius:10px;padding:11px 13px;margin-bottom:14px}
+.pix-steps{font-size:13px;color:var(--ink-2);background:#faf6f9;border-radius:10px;padding:11px 13px 11px 30px;margin-bottom:12px;line-height:1.55}
+.pix-steps li{margin:2px 0}
+#pixWaLink{margin-bottom:10px}
+.pix-ticket{background:#faf6f9;border:1px dashed #e6c9df;border-radius:12px;padding:14px;text-align:center;margin-bottom:12px}
+.pix-ticket-code{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:1px;color:var(--violet)}
+.pix-ticket-msg{font-size:13.5px;color:var(--ink-2);line-height:1.55;margin-bottom:14px}
+.adm-pend{border:1px solid #f6e3c4;background:linear-gradient(120deg,#fffaf0,#fff)}
+.adm-pend-title{margin:0 0 4px;font-size:16px;display:flex;align-items:center;gap:8px}
+.adm-pend-badge{background:var(--grad);color:#fff;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px}
 
 /* ---- contador de vencimento ---- */
 .venc-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-radius:14px;padding:12px 16px;margin-bottom:18px;font-size:14px}

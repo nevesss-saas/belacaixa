@@ -709,7 +709,7 @@ VIEWS.admin = {
 };
 const PLAN_LABEL = { silver_mensal: 'Silver mensal', silver_anual: 'Silver anual', gold_mensal: 'Gold mensal', gold_anual: 'Gold anual' };
 function statusBadge(s, active) {
-  if (s === 'pix') return '<span class="adm-badge b-pix">Pix (conferir)</span>';
+  if (s === 'pix') return '<span class="adm-badge b-pix">Pix (validado)</span>';
   if (s === 'sem assinatura') return '<span class="adm-badge b-none">Sem assinatura</span>';
   if (active) return '<span class="adm-badge b-on">Ativa</span>';
   return `<span class="adm-badge b-off">${esc(s || 'inativa')}</span>`;
@@ -725,6 +725,29 @@ function adminHTML(d) {
       <td>${venc}</td>
     </tr>`;
   }).join('');
+  const pend = d.pixPending || [];
+  const pendRows = pend.map(p => `<tr>
+      <td><b>${esc(p.ticket_code || '—')}</b></td>
+      <td>${esc(p.business_name || '—')}</td>
+      <td>${esc(p.email || '—')}</td>
+      <td>${PLAN_LABEL[p.plan] || esc(p.plan || '—')}</td>
+      <td>${p.amount_cents != null ? fmt(p.amount_cents / 100) : '—'}</td>
+      <td>${new Date(p.created_at).toLocaleString('pt-BR')}</td>
+      <td class="num" style="white-space:nowrap">
+        <button class="btn btn-primary btn-sm" data-pix-approve="${esc(p.id)}">✓ Liberar</button>
+        <button class="btn btn-ghost btn-sm" data-pix-reject="${esc(p.id)}">Recusar</button>
+      </td></tr>`).join('');
+  const pendCard = pend.length ? `
+    <div class="card mt adm-pend">
+      <h3 class="adm-pend-title">🎟️ Pix aguardando você validar <span class="adm-pend-badge">${pend.length}</span></h3>
+      <p class="muted" style="margin:0 0 12px">Confira no seu WhatsApp o comprovante que o cliente enviou e libere o acesso.</p>
+      <div class="adm-tablewrap">
+        <table class="adm-table">
+          <thead><tr><th>Ticket</th><th>Empresa</th><th>E-mail</th><th>Plano</th><th>Valor</th><th>Data do pedido</th><th></th></tr></thead>
+          <tbody>${pendRows}</tbody>
+        </table>
+      </div>
+    </div>` : '';
   return `
     <div class="grid cols-4">
       ${kpi('👥', 'Usuários cadastrados', d.totalUsers, '', 'linear-gradient(135deg,#3b82f6,#06b6d4)')}
@@ -738,13 +761,14 @@ function adminHTML(d) {
         <button class="btn btn-soft btn-sm" data-act="admin-refresh">🔄 Atualizar</button>
       </div>
     </div>
+    ${pendCard}
     <div class="card mt adm-tablewrap">
       <table class="adm-table">
         <thead><tr><th>Cliente (e-mail)</th><th>Plano</th><th>Status</th><th>Vence/renova</th></tr></thead>
         <tbody>${rows || '<tr><td colspan="4" style="text-align:center;color:var(--muted)">Nenhum cliente ainda.</td></tr>'}</tbody>
       </table>
     </div>
-    <p class="adm-foot">⚠️ Pagamentos no <b>Pix</b> são liberados na confiança — confira os comprovantes que chegam no seu WhatsApp. Atualizado em ${new Date(d.generatedAt).toLocaleString('pt-BR')}.</p>`;
+    <p class="adm-foot">💡 Pagamentos no <b>Pix</b> só liberam depois que você valida o comprovante no ticket acima. Cartão libera sozinho. Atualizado em ${new Date(d.generatedAt).toLocaleString('pt-BR')}.</p>`;
 }
 async function loadAdminStats() {
   const root = $('#adminRoot'); if (!root) return;
@@ -760,9 +784,25 @@ async function loadAdminStats() {
     root.innerHTML = adminHTML(j);
     const rb = root.querySelector('[data-act="admin-refresh"]');
     if (rb) rb.onclick = () => { root.innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Atualizando…</div>'; loadAdminStats(); };
+    root.querySelectorAll('[data-pix-approve]').forEach(b => b.onclick = () => { b.disabled = true; b.textContent = 'Liberando…'; approvePix(b.dataset.pixApprove, 'approve'); });
+    root.querySelectorAll('[data-pix-reject]').forEach(b => b.onclick = () => { if (confirm('Recusar este ticket de Pix? O cliente não terá acesso.')) { b.disabled = true; approvePix(b.dataset.pixReject, 'reject'); } });
   } catch (e) {
     root.innerHTML = '<div class="empty"><span class="e-ico">⚠️</span>Erro ao carregar os dados. Tente novamente.</div>';
   }
+}
+async function approvePix(id, action) {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(window.BELACAIXA_CFG.url + '/functions/v1/pix-approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, apikey: window.BELACAIXA_CFG.anon },
+      body: JSON.stringify({ id, action })
+    });
+    const j = await res.json();
+    if (j.ok) { toast(action === 'reject' ? 'Ticket recusado.' : 'Acesso liberado por Pix! 🎉', 'ok'); }
+    else { toast('Não consegui processar. ' + (j.error || ''), 'warn'); }
+  } catch (e) { toast('Erro ao processar o ticket.', 'warn'); }
+  loadAdminStats();
 }
 
 /* ============================================================
@@ -1099,16 +1139,25 @@ function showSubGate() {
 }
 let pixTier = 'silver';
 const PIX_VAL = { silver_mensal: 'R$ 49,90', silver_anual: 'R$ 490,00', gold_mensal: 'R$ 99,90', gold_anual: 'R$ 949,00' };
+const OWNER_WA = (window.BELACAIXA_CFG && window.BELACAIXA_CFG.whatsapp) || '5522992445995';
+function fmtWa(n) { const d = String(n).replace(/\D/g, '').replace(/^55/, ''); return d.length >= 10 ? `(${d.slice(0, 2)}) ${d.slice(2, d.length - 4)}-${d.slice(-4)}` : n; }
+function pixWaHref(ticket) {
+  const email = (currentUser && currentUser.email) || '';
+  const msg = `Olá! Segue o comprovante do meu Pix do BelaCaixa.\nTicket: ${ticket || '(vou gerar)'}\nPlano: ${currentPixPlan()}\nEmail: ${email}`;
+  return `https://wa.me/${OWNER_WA}?text=${encodeURIComponent(msg)}`;
+}
 function currentPixPlan() { return pixTier + '_' + (subBilling === 'ano' ? 'anual' : 'mensal'); }
 function updatePixAmount() {
   const p = currentPixPlan();
   const v = $('#pixValor'), per = $('#pixPeriodo');
   if (v) v.textContent = PIX_VAL[p];
   if (per) per.textContent = subBilling === 'ano' ? '/ano (à vista)' : '/mês';
+  const num = $('#pixWaNum'); if (num) num.textContent = fmtWa(OWNER_WA);
+  const link = $('#pixWaLink'); if (link) link.href = pixWaHref('');
 }
 async function pixClaim() {
-  if (demoMode || !currentUser) { toast('Crie sua conta gratuita pra liberar o Pix 💜', 'info'); demoSignup(); return; }
-  const btn = $('#pixDone'); if (btn) { btn.disabled = true; btn.dataset.old = btn.textContent; btn.textContent = 'Liberando…'; }
+  if (demoMode || !currentUser) { toast('Crie sua conta gratuita pra usar o Pix 💜', 'info'); demoSignup(); return; }
+  const btn = $('#pixDone'); if (btn) { btn.disabled = true; btn.dataset.old = btn.textContent; btn.textContent = 'Gerando ticket…'; }
   try {
     const { data: { session } } = await sb.auth.getSession();
     const res = await fetch(window.BELACAIXA_CFG.url + '/functions/v1/pix-claim', {
@@ -1117,10 +1166,25 @@ async function pixClaim() {
       body: JSON.stringify({ plan: currentPixPlan() })
     });
     const j = await res.json();
-    if (j.ok) { toast('Acesso liberado via Pix! 🎉', 'ok'); await loadSubscription(); await enterApp(); return; }
-    toast('Não consegui liberar. ' + (j.error || ''), 'warn');
-  } catch (e) { toast('Erro ao liberar acesso.', 'warn'); }
+    if (j.ok && j.pending) { showPixTicket(j.ticket); return; }
+    toast('Não consegui registrar seu Pix. ' + (j.error || ''), 'warn');
+  } catch (e) { toast('Erro ao registrar o Pix.', 'warn'); }
   if (btn) { btn.disabled = false; if (btn.dataset.old) btn.textContent = btn.dataset.old; }
+}
+function showPixTicket(ticket) {
+  const panel = $('#pixPanel'); if (!panel) return;
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="pix-head">
+      <span style="font-size:34px">🎟️</span>
+      <div><b>Ticket gerado!</b><div class="muted">Falta só o dono validar seu comprovante</div></div>
+    </div>
+    <div class="pix-ticket"><span class="muted">Seu ticket</span><div class="pix-ticket-code">${esc(ticket)}</div></div>
+    <p class="pix-ticket-msg">Agora envie o <b>comprovante</b> do Pix pelo WhatsApp <b>${fmtWa(OWNER_WA)}</b>. Assim que o dono confirmar o pagamento, seu acesso é liberado — é só <b>entrar de novo</b>. 💜</p>
+    <a class="btn btn-primary btn-block" href="${pixWaHref(ticket)}" target="_blank" rel="noopener">📲 Enviar comprovante agora</a>
+    <button type="button" class="btn btn-ghost btn-block" data-logout>Sair</button>`;
+  const lo = panel.querySelector('[data-logout]'); if (lo) lo.onclick = logout;
+  toast('Ticket ' + ticket + ' gerado! Envie o comprovante no WhatsApp. 📲', 'ok');
 }
 function wireSub() {
   const t = $('#subBillToggle');

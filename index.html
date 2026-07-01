@@ -264,7 +264,7 @@
         <div class="pix-panel" id="pixPanel" hidden>
           <div class="pix-head">
             <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><rect x="5.7" y="5.7" width="12.6" height="12.6" rx="3.4" transform="rotate(45 12 12)" fill="#32BCAD"/></svg>
-            <div><b>Pagar com Pix</b><div class="muted">Liberação na hora após confirmar</div></div>
+            <div><b>Pagar com Pix</b><div class="muted">Acesso liberado após o dono validar seu comprovante</div></div>
           </div>
           <div class="seg pix-tier">
             <button type="button" class="on" data-pix-tier="silver">SILVER</button>
@@ -276,8 +276,13 @@
             <button type="button" class="btn btn-soft btn-sm" id="pixCopy">Copiar</button>
           </div>
           <div class="pix-name"><span class="muted">Recebedor:</span> <b>EMT TECNOLOGIA LTDA</b></div>
-          <p class="pix-steps"><b>1.</b> Faça o Pix do valor acima para a chave. &nbsp; <b>2.</b> Clique em “Já fiz o Pix” para liberar seu acesso.</p>
-          <button type="button" class="btn btn-primary btn-block" id="pixDone">✓ Já fiz o Pix</button>
+          <ol class="pix-steps">
+            <li>Faça o Pix do valor acima para a chave.</li>
+            <li>Envie o <b>comprovante</b> pelo WhatsApp <b id="pixWaNum">(22) 99244-5995</b>.</li>
+            <li>Toque em <b>“Já paguei”</b> para gerar seu <b>ticket</b>. Seu acesso é liberado assim que o dono confirmar. 🔒</li>
+          </ol>
+          <a class="btn btn-soft btn-block" id="pixWaLink" href="#" target="_blank" rel="noopener">📲 Enviar comprovante no WhatsApp</a>
+          <button type="button" class="btn btn-primary btn-block" id="pixDone">✓ Já paguei — gerar meu ticket</button>
         </div>
       </div>
       <div class="sub-foot">
