@@ -752,7 +752,7 @@ VIEWS.servicos = {
 
 /* ---------- ADMIN (painel do dono) ---------- */
 VIEWS.admin = {
-  title: '👑 Painel do Dono', subtitle: 'Visão geral de todos os clientes do sistema',
+  title: '🛡️ Administrador', subtitle: 'Área exclusiva do administrador — visão geral de todos os clientes',
   html() {
     return `<div id="adminRoot"><div class="empty"><span class="e-ico">⏳</span>Carregando dados do sistema…</div></div>`;
   },
@@ -1386,7 +1386,7 @@ async function enterApp() {
   const em = $('#sbUserEmail'); if (em) em.textContent = currentUser.email;
   updatePlanChip();
   const adm = $('#navAdmin'); if (adm) adm.hidden = !isAdmin();
-  if (isAdmin()) { const chip = $('#sbPlanChip'); if (chip) chip.textContent = '👑 DONO'; }
+  if (isAdmin()) { const chip = $('#sbPlanChip'); if (chip) chip.textContent = '🛡️ ADMIN'; }
   render(); window.scrollTo(0, 0);
 }
 function exitApp() { $('#app').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#landing').hidden = false; document.body.style.background = ''; window.scrollTo(0, 0); }
