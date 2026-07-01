@@ -1057,13 +1057,28 @@ function accessNotExpired() {
   return true;
 }
 function subActive() { return !!(subInfo && ['active', 'trialing', 'pix'].includes(subInfo.status) && accessNotExpired()); }
-function hasAccess() { return subActive(); }
+/* Teste grátis: 24h a partir da criação da conta (created_at). Não reseta ao relogar. */
+const TRIAL_MS = 24 * 60 * 60 * 1000;
+function trialInfo() {
+  if (!currentUser || !currentUser.created_at) return null;
+  const start = new Date(currentUser.created_at).getTime();
+  if (isNaN(start)) return null;
+  const msLeft = start + TRIAL_MS - Date.now();
+  return { msLeft, active: msLeft > 0, hoursLeft: Math.max(1, Math.ceil(msLeft / 3600000)) };
+}
+function trialActive() { const t = trialInfo(); return !!(t && t.active); }
+function hasAccess() { return subActive() || trialActive(); }
 function vencInfo() {
   if (!subInfo || !subInfo.current_period_end) return null;
   const end = new Date(subInfo.current_period_end);
   return { end, days: Math.ceil((end.getTime() - Date.now()) / 86400000), recorrente: !!subInfo.stripe_subscription_id };
 }
 function vencBannerHTML() {
+  if (isAdmin()) return '';
+  if (!subActive() && trialActive()) {
+    const t = trialInfo();
+    return `<div class="venc-bar tone-amber"><span>🎁 <b>Teste grátis</b> · termina em ${t.hoursLeft}h — aproveite pra assinar</span><button class="btn btn-soft btn-sm" data-act="assinar" style="margin-left:auto">Assinar agora</button></div>`;
+  }
   if (!hasAccess()) return '';
   const v = vencInfo(); if (!v) return '';
   const tone = v.days <= 5 ? 'amber' : 'violet';
@@ -1072,11 +1087,11 @@ function vencBannerHTML() {
   return `<div class="venc-bar tone-${tone}"><span>⏳ ${verbo} <b>${v.days} dia(s)</b> · ${v.end.toLocaleDateString('pt-BR')}</span>${acao}</div>`;
 }
 async function pollSub(n) { for (let i = 0; i < n; i++) { await new Promise(r => setTimeout(r, 1500)); await loadSubscription(); if (subActive()) return; } }
-function updatePlanChip() { const c = $('#sbPlanChip'); if (!c) return; if (hasAccess()) { const tier = subInfo.plan ? subInfo.plan.split('_')[0].toUpperCase() : 'ativo'; c.textContent = 'Plano ' + tier + (subInfo.status === 'pix' ? ' · Pix' : ''); } else c.textContent = 'Sem plano'; }
+function updatePlanChip() { const c = $('#sbPlanChip'); if (!c) return; if (subActive()) { const tier = subInfo.plan ? subInfo.plan.split('_')[0].toUpperCase() : 'ativo'; c.textContent = 'Plano ' + tier + (subInfo.status === 'pix' ? ' · Pix' : ''); } else if (trialActive()) { c.textContent = '🎁 Teste · ' + trialInfo().hoursLeft + 'h'; } else c.textContent = 'Sem plano'; }
 function showSubGate() {
   $('#landing').hidden = true; $('#authScreen').hidden = true; $('#app').hidden = true; $('#subScreen').hidden = false;
   document.body.style.background = '';
-  const msg = $('#subTrialMsg'); if (msg) msg.textContent = (currentUser ? currentUser.email + ' · ' : '') + 'Assine um plano para acessar o painel.';
+  const msg = $('#subTrialMsg'); if (msg) { const t = trialInfo(); const pre = (currentUser ? currentUser.email + ' · ' : ''); msg.textContent = pre + (t && !t.active ? 'Seu teste grátis de 24h terminou. Assine para continuar.' : 'Assine um plano para acessar o painel.'); }
   window.scrollTo(0, 0);
 }
 let pixTier = 'silver';
