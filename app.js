@@ -1089,6 +1089,9 @@ function vencBannerHTML() {
 async function pollSub(n) { for (let i = 0; i < n; i++) { await new Promise(r => setTimeout(r, 1500)); await loadSubscription(); if (subActive()) return; } }
 function updatePlanChip() { const c = $('#sbPlanChip'); if (!c) return; if (subActive()) { const tier = subInfo.plan ? subInfo.plan.split('_')[0].toUpperCase() : 'ativo'; c.textContent = 'Plano ' + tier + (subInfo.status === 'pix' ? ' · Pix' : ''); } else if (trialActive()) { c.textContent = '🎁 Teste · ' + trialInfo().hoursLeft + 'h'; } else c.textContent = 'Sem plano'; }
 function showSubGate() {
+  // Na demonstração (ou deslogado) não dá pra assinar — manda criar a conta.
+  if (demoMode) { toast('Crie sua conta gratuita pra assinar 💜', 'info'); demoSignup(); return; }
+  if (!currentUser) { showAuth('signup'); return; }
   $('#landing').hidden = true; $('#authScreen').hidden = true; $('#app').hidden = true; $('#subScreen').hidden = false;
   document.body.style.background = '';
   const msg = $('#subTrialMsg'); if (msg) { const t = trialInfo(); const pre = (currentUser ? currentUser.email + ' · ' : ''); msg.textContent = pre + (t && !t.active ? 'Seu teste grátis de 24h terminou. Assine para continuar.' : 'Assine um plano para acessar o painel.'); }
@@ -1104,6 +1107,7 @@ function updatePixAmount() {
   if (per) per.textContent = subBilling === 'ano' ? '/ano (à vista)' : '/mês';
 }
 async function pixClaim() {
+  if (demoMode || !currentUser) { toast('Crie sua conta gratuita pra liberar o Pix 💜', 'info'); demoSignup(); return; }
   const btn = $('#pixDone'); if (btn) { btn.disabled = true; btn.dataset.old = btn.textContent; btn.textContent = 'Liberando…'; }
   try {
     const { data: { session } } = await sb.auth.getSession();
@@ -1138,6 +1142,7 @@ function wireSub() {
   const pd = $('#pixDone'); if (pd) pd.onclick = pixClaim;
 }
 async function startCheckout(plan, btn) {
+  if (demoMode || !currentUser) { toast('Crie sua conta gratuita pra assinar 💜', 'info'); demoSignup(); return; }
   try {
     if (btn) { btn.disabled = true; btn.dataset.old = btn.textContent; btn.textContent = 'Abrindo pagamento…'; }
     const { data: { session } } = await sb.auth.getSession();
