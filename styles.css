@@ -431,6 +431,7 @@ textarea{resize:vertical;min-height:70px}
 .ib-edit:hover{background:#d5e6ff}
 .ib-ghost{background:#f0eef4;color:var(--ink-2)}
 .ib-ghost:hover{background:#e6e2ee}
+.ib-sm{width:30px;height:30px;font-size:13px;border-radius:8px}
 
 /* ---- serviços ---- */
 .svc-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:16px}

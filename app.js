@@ -643,7 +643,11 @@ VIEWS.estoque = {
       return `<tr><td><b>${esc(it.name)}</b><div class="muted" style="font-size:12.5px">${esc(it.category)} · ${esc(it.supplier)}</div></td>
         <td class="num">${it.qty} ${it.unit}</td><td><span class="badge ${st[0]}">${st[1]}</span></td>
         <td class="num">${d > 60 ? '60+' : d} d</td>
-        <td class="num"><button class="btn btn-soft btn-sm" data-act="repor-item" data-id="${it.id}">Repor</button></td></tr>`;
+        <td class="num"><div class="row" style="gap:6px;justify-content:flex-end">
+          <button class="btn btn-soft btn-sm" data-act="repor-item" data-id="${it.id}">Repor</button>
+          <button class="ib ib-edit ib-sm" data-act="edit-item" data-id="${it.id}" title="Editar item">✏️</button>
+          <button class="ib ib-ghost ib-sm" data-act="del-item" data-id="${it.id}" title="Excluir item">🗑️</button>
+        </div></td></tr>`;
     }).join('')}</tbody></table></div>
       </div>
 
@@ -938,25 +942,28 @@ function setView(v) { currentView = v; $('.sidebar')?.classList.remove('open'); 
    MODAIS (formulários)
    ============================================================ */
 function modalAtendimento() {
-  const opts = state.services.map(s => `<option value="${s.id}">${esc(s.name)} — ${fmt(s.price)}</option>`).join('');
+  const servopts = state.services.map(s => `<option value="${esc(s.name)}">${fmt(s.price)}</option>`).join('');
   const clopts = state.clients.map(c => `<option value="${esc(c.name)}">`).join('');
+  const first = state.services[0];
   openModal('Registrar atendimento', `
-    <div class="field"><label>Serviço</label><select id="f_serv">${opts}</select></div>
+    <div class="field"><label>Serviço</label><input class="input" id="f_serv" list="servdl" placeholder="Escolha ou digite um serviço" value="${first ? esc(first.name) : ''}"/><datalist id="servdl">${servopts}</datalist><span class="muted" style="font-size:12.5px">Escolha da lista ou digite um serviço novo ✍️ — o valor você ajusta abaixo</span></div>
     <div class="field"><label>Cliente</label><input class="input" id="f_cli" list="clidl" placeholder="Nome da cliente"/><datalist id="clidl">${clopts}</datalist><span class="muted" style="font-size:12.5px">Cliente nova é cadastrada automaticamente ✨</span></div>
     <div class="field-row"><div class="field"><label>Valor (R$)</label><input class="input" id="f_val" type="number" step="0.01"/></div><div class="field"><label>Data</label><input class="input" id="f_date" type="date" value="${todayISO()}"/></div></div>
-    <label class="row" style="gap:8px;font-size:14px"><input type="checkbox" id="f_baixa" checked style="width:auto"/> Dar baixa no material usado</label>
+    <label class="row" style="gap:8px;font-size:14px"><input type="checkbox" id="f_baixa" checked style="width:auto"/> Dar baixa no material usado (serviços conhecidos)</label>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="f_save">Registrar</button>`);
-  const sv = () => state.services.find(s => s.id === $('#f_serv').value);
-  $('#f_val').value = sv().price;
-  $('#f_serv').onchange = () => $('#f_val').value = sv().price;
+  const findServ = () => state.services.find(s => s.name.toLowerCase() === $('#f_serv').value.trim().toLowerCase());
+  const svc0 = findServ(); if (svc0) $('#f_val').value = svc0.price;
+  $('#f_serv').oninput = () => { const s = findServ(); if (s) $('#f_val').value = s.price; };
   $('#f_save').onclick = () => {
+    const servName = $('#f_serv').value.trim();
     const name = $('#f_cli').value.trim(); const val = parseFloat($('#f_val').value);
+    if (!servName) return toast('Informe o serviço.', 'warn');
     if (!name || !(val >= 0)) return toast('Preencha cliente e valor.', 'warn');
     let cli = state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
     if (!cli) { cli = { id: 'c_' + uid(), name, phone: '', birthday: '', notes: '', createdAt: todayISO() }; state.clients.push(cli); toast(`Cliente "${name}" cadastrada automaticamente 💖`, 'ok'); }
-    const service = sv();
-    state.transactions.push({ id: uid(), type: 'in', category: 'Atendimentos', amount: val, desc: service.name + ' — ' + name.split(' ')[0], date: $('#f_date').value, clientId: cli.id });
-    if ($('#f_baixa').checked) deduct(service);
+    const service = findServ();
+    state.transactions.push({ id: uid(), type: 'in', category: 'Atendimentos', amount: val, desc: servName + ' — ' + name.split(' ')[0], date: $('#f_date').value, clientId: cli.id });
+    if (service && $('#f_baixa').checked) deduct(service);
     save(); closeModal(); render(); toast('Atendimento registrado! ' + fmt(val) + ' no caixa.', 'ok');
   };
 }
@@ -1028,17 +1035,19 @@ function modalAgenda(pre) {
     save(); closeModal(); render(); toast('Atendimento agendado 📅', 'ok');
   };
 }
-function modalItem() {
-  openModal('Novo item de estoque', `
-    <div class="field"><label>Nome</label><input class="input" id="i_name" placeholder="Ex.: Esmalte vermelho"/></div>
-    <div class="field-row"><div class="field"><label>Quantidade</label><input class="input" id="i_qty" type="number" step="0.01" value="0"/></div><div class="field"><label>Unidade</label><input class="input" id="i_unit" value="un"/></div></div>
-    <div class="field-row"><div class="field"><label>Estoque mínimo</label><input class="input" id="i_min" type="number" step="0.01" value="1"/></div><div class="field"><label>Custo unit. (R$)</label><input class="input" id="i_cost" type="number" step="0.01" value="0"/></div></div>
-    <div class="field-row"><div class="field"><label>Categoria</label><input class="input" id="i_cat" value="Geral"/></div><div class="field"><label>Fornecedor</label><input class="input" id="i_sup" placeholder="Fornecedor"/></div></div>
+function modalItem(id) {
+  const it = id ? state.inventory.find(i => i.id === id) : null;
+  openModal(it ? '✏️ Editar item' : '📦 Novo item de estoque', `
+    <div class="field"><label>Nome</label><input class="input" id="i_name" placeholder="Ex.: Esmalte vermelho" value="${it ? esc(it.name) : ''}"/></div>
+    <div class="field-row"><div class="field"><label>Quantidade</label><input class="input" id="i_qty" type="number" step="0.01" value="${it ? it.qty : 0}"/></div><div class="field"><label>Unidade</label><input class="input" id="i_unit" value="${it ? esc(it.unit) : 'un'}"/></div></div>
+    <div class="field-row"><div class="field"><label>Estoque mínimo</label><input class="input" id="i_min" type="number" step="0.01" value="${it ? it.min : 1}"/></div><div class="field"><label>Custo unit. (R$)</label><input class="input" id="i_cost" type="number" step="0.01" value="${it ? it.cost : 0}"/></div></div>
+    <div class="field-row"><div class="field"><label>Categoria</label><input class="input" id="i_cat" value="${it ? esc(it.category) : 'Geral'}"/></div><div class="field"><label>Fornecedor</label><input class="input" id="i_sup" placeholder="Fornecedor" value="${it && it.supplier && it.supplier !== '—' ? esc(it.supplier) : ''}"/></div></div>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="i_save">Salvar</button>`);
   $('#i_save').onclick = () => {
     const name = $('#i_name').value.trim(); if (!name) return toast('Informe o nome.', 'warn');
-    state.inventory.push({ id: 'i_' + uid(), name, category: $('#i_cat').value.trim() || 'Geral', qty: +$('#i_qty').value, unit: $('#i_unit').value.trim() || 'un', min: +$('#i_min').value, cost: +$('#i_cost').value, supplier: $('#i_sup').value.trim() || '—', use: 0.05 });
-    save(); closeModal(); render(); toast('Item adicionado ao estoque 📦', 'ok');
+    const data = { name, category: $('#i_cat').value.trim() || 'Geral', qty: +$('#i_qty').value, unit: $('#i_unit').value.trim() || 'un', min: +$('#i_min').value, cost: +$('#i_cost').value, supplier: $('#i_sup').value.trim() || '—' };
+    if (it) { Object.assign(it, data); } else { state.inventory.push({ id: 'i_' + uid(), ...data, use: 0.05 }); }
+    save(); closeModal(); render(); toast(it ? 'Item atualizado ✨' : 'Item adicionado ao estoque 📦', 'ok');
   };
 }
 function modalAsset() {
@@ -1129,6 +1138,8 @@ const ACTIONS = {
   'go-patrimonio': () => setView('patrimonio'),
   'assinar': () => showSubGate(),
   'repor-item': (id) => modalRepor(id),
+  'edit-item': (id) => modalItem(id),
+  'del-item': (id) => { const it = state.inventory.find(i => i.id === id); if (it && confirm('Excluir "' + it.name + '" do estoque?')) { state.inventory = state.inventory.filter(i => i.id !== id); save(); render(); toast('Item removido do estoque.', 'info'); } },
   'comprar-promo': (id) => { const m = state.market.find(x => x.id === id); if (m) modalRepor(m.itemId); },
   'done-appt': (id) => {
     const a = state.appointments.find(x => x.id === id); if (!a) return;
