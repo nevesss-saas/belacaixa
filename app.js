@@ -27,7 +27,7 @@ let state = null;          // carregado da nuvem após login
 let sb = null;             // cliente Supabase
 let currentUser = null;    // usuária logada
 let demoMode = false;      // demonstração navegável (sem login, sem nuvem)
-const ADMIN_EMAIL = 'celula.ruach18@gmail.com';   // dono que vê o painel admin
+const ADMIN_EMAIL = 'celula.ruach18@gmail.com';   // administrador que vê o painel
 const isAdmin = () => !demoMode && !!currentUser && (currentUser.email || '').toLowerCase() === ADMIN_EMAIL;
 
 /* ============================================================
@@ -750,7 +750,7 @@ VIEWS.servicos = {
   }
 };
 
-/* ---------- ADMIN (painel do dono) ---------- */
+/* ---------- ADMIN (administrador) ---------- */
 VIEWS.admin = {
   title: '🛡️ Administrador', subtitle: 'Área exclusiva do administrador — visão geral de todos os clientes',
   html() {
@@ -1325,10 +1325,10 @@ function showPixTicket(ticket) {
   panel.innerHTML = `
     <div class="pix-head">
       <span style="font-size:34px">🎟️</span>
-      <div><b>Ticket gerado!</b><div class="muted">Falta só o dono validar seu comprovante</div></div>
+      <div><b>Ticket gerado!</b><div class="muted">Falta só validarmos seu comprovante</div></div>
     </div>
     <div class="pix-ticket"><span class="muted">Seu ticket</span><div class="pix-ticket-code">${esc(ticket)}</div></div>
-    <p class="pix-ticket-msg">Agora envie o <b>comprovante</b> do Pix pelo WhatsApp <b>${fmtWa(OWNER_WA)}</b>. Assim que o dono confirmar o pagamento, seu acesso é liberado — é só <b>entrar de novo</b>. 💜</p>
+    <p class="pix-ticket-msg">Agora envie o <b>comprovante</b> do Pix pelo WhatsApp <b>${fmtWa(OWNER_WA)}</b>. Assim que confirmarmos o pagamento, seu acesso é liberado — é só <b>entrar de novo</b>. 💜</p>
     <a class="btn btn-primary btn-block" href="${pixWaHref(ticket)}" target="_blank" rel="noopener">📲 Enviar comprovante agora</a>
     <button type="button" class="btn btn-ghost btn-block" data-logout>Sair</button>`;
   const lo = panel.querySelector('[data-logout]'); if (lo) lo.onclick = logout;
@@ -1382,7 +1382,7 @@ async function enterApp() {
   const params = new URLSearchParams(location.search);
   if (params.get('assinatura') === 'sucesso' && !subActive()) { $('#viewRoot').innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Confirmando seu pagamento…</div>'; await pollSub(8); }
   if (params.get('assinatura')) { const ok = params.get('assinatura') === 'sucesso' && subActive(); history.replaceState({}, '', location.pathname); if (ok) toast('Assinatura ativada! 🎉', 'ok'); }
-  if (!hasAccess() && !isAdmin()) { showSubGate(); return; }   // o dono entra sem pagar
+  if (!hasAccess() && !isAdmin()) { showSubGate(); return; }   // o administrador entra sem pagar
   const em = $('#sbUserEmail'); if (em) em.textContent = currentUser.email;
   updatePlanChip();
   const adm = $('#navAdmin'); if (adm) adm.hidden = !isAdmin();
