@@ -782,6 +782,9 @@ function pipeCard(c, kind) {
   let actions;
   if (kind === 'active') {
     actions = ib('edit', 'ib-edit', '✏️', 'Editar plano/validade') + ib('revoke', 'ib-danger', '🚫', 'Revogar acesso');
+  } else if (kind === 'inactive') {
+    // inativo: liberar acesso, editar ou EXCLUIR o cliente por completo (some do pipeline)
+    actions = ib('activate', 'ib-ok', '✅', 'Liberar acesso') + ib('edit', 'ib-edit', '✏️', 'Editar') + ib('purge', 'ib-danger', '🗑️', 'Excluir cliente (apaga conta e dados)');
   } else {
     const canDel = c.status && c.status !== 'sem assinatura';
     actions = ib('activate', 'ib-ok', '✅', 'Liberar acesso') + ib('edit', 'ib-edit', '✏️', 'Editar') + (canDel ? ib('delete', 'ib-ghost', '🗑️', 'Excluir assinatura') : '');
@@ -817,6 +820,10 @@ function adminHTML(d) {
   const trial = clients.filter(c => c.stage === 'trial');
   const active = clients.filter(c => c.stage === 'active');
   const inactive = clients.filter(c => c.stage === 'inactive');
+  const inactiveUids = inactive.map(c => c.user_id).filter(Boolean);
+  const clearBtn = inactiveUids.length
+    ? `<button class="btn btn-danger btn-sm" data-act="clear-inactive" data-uids='${esc(JSON.stringify(inactiveUids))}'>🧹 Limpar inativos (${inactiveUids.length})</button>`
+    : '';
   const board = `
     <div class="pipe">
       ${pipeCol('🎟️', 'Pix a validar', 'col-pix', pend.map(pixCard), 'Nenhum Pix aguardando')}
@@ -834,7 +841,7 @@ function adminHTML(d) {
     <div class="card mt">
       <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div><b>Distribuição por plano:</b> ${planos}</div>
-        <button class="btn btn-soft btn-sm" data-act="admin-refresh">🔄 Atualizar</button>
+        <div class="row" style="gap:8px;flex-wrap:wrap">${clearBtn}<button class="btn btn-soft btn-sm" data-act="admin-refresh">🔄 Atualizar</button></div>
       </div>
     </div>
     <div class="pipe-head"><h3 class="pipe-title">📊 Pipeline de clientes</h3>
@@ -856,12 +863,15 @@ async function loadAdminStats() {
     root.innerHTML = adminHTML(j);
     const rb = root.querySelector('[data-act="admin-refresh"]');
     if (rb) rb.onclick = () => { root.innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Atualizando…</div>'; loadAdminStats(); };
+    const cb = root.querySelector('[data-act="clear-inactive"]');
+    if (cb) cb.onclick = () => bulkPurgeInactive(cb.dataset.uids);
     root.querySelectorAll('[data-pix-approve]').forEach(b => b.onclick = () => { b.disabled = true; b.textContent = '…'; approvePix(b.dataset.pixApprove, 'approve'); });
     root.querySelectorAll('[data-pix-reject]').forEach(b => b.onclick = () => { if (confirm('Recusar este ticket de Pix? O cliente não terá acesso.')) { b.disabled = true; approvePix(b.dataset.pixReject, 'reject'); } });
     root.querySelectorAll('[data-cli-action]').forEach(b => b.onclick = () => {
       const uid = b.dataset.uid, email = b.dataset.email, plan = b.dataset.plan, nome = b.dataset.nome, act = b.dataset.cliAction;
       if (act === 'revoke') { if (confirm('Revogar o acesso de ' + (nome || email) + '? Ele perde o acesso na hora.')) adminAction(uid, 'revoke'); }
       else if (act === 'delete') { if (confirm('Excluir a assinatura de ' + (nome || email) + '? (a conta continua, só zera a assinatura)')) adminAction(uid, 'delete'); }
+      else if (act === 'purge') { if (confirm('EXCLUIR DEFINITIVAMENTE ' + (nome || email) + '?\n\nIsso apaga a CONTA, os DADOS e a assinatura. O cliente some do pipeline e NÃO dá pra desfazer.')) adminAction(uid, 'purge'); }
       else modalEditClient(uid, email, plan, nome, act);
     });
   } catch (e) {
@@ -882,7 +892,7 @@ async function approvePix(id, action) {
   } catch (e) { toast('Erro ao processar o ticket.', 'warn'); }
   loadAdminStats();
 }
-async function adminAction(uid, action, extra) {
+async function adminAction(uid, action, extra, silent) {
   try {
     const { data: { session } } = await sb.auth.getSession();
     const res = await fetch(window.BELACAIXA_CFG.url + '/functions/v1/admin-action', {
@@ -892,13 +902,28 @@ async function adminAction(uid, action, extra) {
     });
     const j = await res.json();
     if (j.ok) {
-      toast(action === 'revoke' ? 'Acesso revogado.' : action === 'delete' ? 'Assinatura excluída.' : 'Acesso liberado! 🎉', 'ok');
-      loadAdminStats();
+      if (!silent) {
+        toast(action === 'revoke' ? 'Acesso revogado.' : action === 'delete' ? 'Assinatura excluída.' : action === 'purge' ? 'Cliente excluído. 🗑️' : 'Acesso liberado! 🎉', 'ok');
+        loadAdminStats();
+      }
       return true;
     }
-    toast('Não consegui. ' + (j.error || ''), 'warn');
-  } catch (e) { toast('Erro na ação.', 'warn'); }
+    if (!silent) toast('Não consegui. ' + (j.error || ''), 'warn');
+  } catch (e) { if (!silent) toast('Erro na ação.', 'warn'); }
   return false;
+}
+// exclui TODOS os inativos de uma vez (cada um: conta + dados + assinatura)
+async function bulkPurgeInactive(uidsJson) {
+  let uids = [];
+  try { uids = JSON.parse(uidsJson || '[]'); } catch (e) { uids = []; }
+  if (!uids.length) return toast('Nenhum inativo pra excluir.', 'info');
+  if (!confirm('EXCLUIR DEFINITIVAMENTE ' + uids.length + ' cliente(s) inativo(s)?\n\nApaga a CONTA, os DADOS e a assinatura de cada um. NÃO dá pra desfazer.')) return;
+  const root = $('#adminRoot');
+  if (root) root.innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Excluindo inativos…</div>';
+  let ok = 0, fail = 0;
+  for (const uid of uids) { if (await adminAction(uid, 'purge', null, true)) ok++; else fail++; }
+  toast('Inativos excluídos: ' + ok + (fail ? ' · falhas: ' + fail : '') + ' 🧹', fail ? 'warn' : 'ok');
+  loadAdminStats();
 }
 function modalEditClient(uid, email, plan, nome, mode) {
   const cur = PLAN_OPTS.includes(plan) ? plan : 'silver_mensal';
