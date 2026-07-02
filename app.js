@@ -1039,7 +1039,7 @@ function modalAtendimento() {
     const name = $('#f_cli').value.trim(); const val = parseFloat($('#f_val').value);
     if (!servName) return toast('Informe o serviço.', 'warn');
     if (!name || !(val >= 0)) return toast('Preencha cliente e valor.', 'warn');
-    let cli = state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
+    let cli = findClientByContact(name, '');
     if (!cli) { cli = { id: 'c_' + uid(), name, phone: '', birthday: '', notes: '', createdAt: todayISO() }; state.clients.push(cli); toast(`Cliente "${name}" cadastrada automaticamente 💖`, 'ok'); }
     const service = findServ();
     state.transactions.push({ id: uid(), type: 'in', category: 'Atendimentos', amount: val, desc: servName + ' — ' + name.split(' ')[0], date: $('#f_date').value, clientId: cli.id });
@@ -1142,14 +1142,31 @@ function modalCliente() {
     save(); closeModal(); render(); toast('Cliente cadastrada 💖', 'ok');
   };
 }
+// --- Cruzamento cliente↔agendamento: casa por TELEFONE (só dígitos, sem DDI) e, se não, por nome ---
+function phoneKey(raw) {
+  let d = String(raw || '').replace(/\D/g, '');
+  if (d.length > 11 && d.slice(0, 2) === '55') d = d.slice(2);   // tira o +55 pra comparar
+  return d;
+}
+function findClientByContact(name, phone) {
+  const pk = phoneKey(phone);
+  if (pk.length >= 8) {
+    const byPhone = state.clients.find(c => phoneKey(c.phone) === pk);
+    if (byPhone) return byPhone;                                  // mesma pessoa, mesmo número → não duplica
+  }
+  const ln = String(name || '').trim().toLowerCase();
+  if (ln) return state.clients.find(c => String(c.name).trim().toLowerCase() === ln) || null;
+  return null;
+}
 function modalAgenda(pre) {
   const p = pre || {};
   const slot = { iso: p.iso, time: p.time };
   if (!slot.iso || !slot.time) { const sg = suggestSlot(); slot.iso = slot.iso || sg.iso; slot.time = slot.time || sg.time; }
+  const linkedCli = p.fromLink ? findClientByContact(p.cli, p.phone) : null;
   const opts = state.services.map(s => `<option value="${s.id}"${p.serviceId === s.id ? ' selected' : ''}>${esc(s.name)} — ${fmt(s.price)}</option>`).join('');
   const clopts = state.clients.map(c => `<option value="${esc(c.name)}">`).join('');
   openModal('Agendar atendimento', `
-    ${p.fromLink ? `<div class="insight tone-violet" style="margin:0 0 12px;max-width:none"><div class="ins-ico" style="background:#f3e8ff">📲</div><div><h4 style="margin:0">Pedido pelo seu link 💜</h4><p style="margin:2px 0 0">Confira os dados e toque em <b>Agendar</b> pra confirmar.${p.note ? '<br><b>Obs. da cliente:</b> ' + esc(p.note) : ''}</p></div></div>` : ''}
+    ${p.fromLink ? `<div class="insight tone-violet" style="margin:0 0 12px;max-width:none"><div class="ins-ico" style="background:#f3e8ff">📲</div><div><h4 style="margin:0">Pedido pelo seu link 💜</h4><p style="margin:2px 0 0">Confira os dados e toque em <b>Agendar</b> pra confirmar.${p.note ? '<br><b>Obs. da cliente:</b> ' + esc(p.note) : ''}<br>${linkedCli ? '✅ <b>Cliente já cadastrada:</b> ' + esc(linkedCli.name) + ' — vou vincular a esta ficha' : '✨ <b>Cliente nova</b> — vou cadastrar ao confirmar'}${p.phone ? ' · 📞 ' + esc(p.phone) : ''}</p></div></div>` : ''}
     <div class="field"><label>Cliente</label><input class="input" id="a_cli" list="adl" placeholder="Nome da cliente" value="${p.cli ? esc(p.cli) : ''}"/><datalist id="adl">${clopts}</datalist></div>
     <div class="field"><label>Serviço</label><select id="a_serv">${opts}</select></div>
     <div class="field-row"><div class="field"><label>Data</label><input class="input" id="a_date" type="date" value="${slot.iso}"/></div><div class="field"><label>Horário</label><input class="input" id="a_time" type="time" value="${slot.time}"/></div></div>
@@ -1157,11 +1174,13 @@ function modalAgenda(pre) {
   $('#a_save').onclick = () => {
     const name = $('#a_cli').value.trim(); if (!name) return toast('Informe a cliente.', 'warn');
     const sv = state.services.find(s => s.id === $('#a_serv').value);
-    let cli = state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
-    if (!cli) { cli = { id: 'c_' + uid(), name, phone: p.phone || '', birthday: '', notes: '', createdAt: todayISO() }; state.clients.push(cli); }
-    else if (p.phone && !cli.phone) { cli.phone = p.phone; }
+    let cli = findClientByContact(name, p.phone);
+    let novo = false;
+    if (!cli) { cli = { id: 'c_' + uid(), name, phone: p.phone || '', birthday: '', notes: '', createdAt: todayISO() }; state.clients.push(cli); novo = true; }
+    else if (p.phone && !cli.phone) { cli.phone = p.phone; }   // completa o telefone da ficha existente
     state.appointments.push({ id: uid(), date: $('#a_date').value, time: $('#a_time').value, serviceId: sv.id, serviceName: sv.name, clientId: cli.id, clientName: cli.name, price: sv.price, status: 'agendado' });
-    save(); closeModal(); render(); toast('Atendimento agendado 📅', 'ok');
+    save(); closeModal(); render();
+    toast(novo ? 'Agendado 📅 — cliente nova cadastrada 💜' : 'Agendado 📅 — vinculado a ' + cli.name.split(' ')[0] + ' ✓', 'ok');
   };
 }
 function modalItem(id) {
