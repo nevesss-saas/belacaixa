@@ -725,6 +725,16 @@ VIEWS.assistente = {
 };
 
 /* ---------- SERVIÇOS ---------- */
+function svcMatsHTML(s) {
+  const chips = (s.mat || []).map(([id, q]) => {
+    const it = (state.inventory || []).find(i => i.id === id);
+    if (!it) return '';
+    return `<span class="svc-mat">📦 ${esc(it.name)} · ${q}${it.unit ? ' ' + esc(it.unit) : ''}</span>`;
+  }).filter(Boolean).join('');
+  return chips
+    ? `<div class="svc-recipe">${chips}</div>`
+    : '<div class="svc-recipe"><span class="svc-mat svc-mat-none">Sem baixa de estoque</span></div>';
+}
 VIEWS.servicos = {
   title: 'Serviços', subtitle: 'Cadastre seus serviços e ajuste os preços quando quiser',
   html() {
@@ -734,6 +744,7 @@ VIEWS.servicos = {
         <div class="svc-info">
           <div class="svc-name">${esc(s.name)}</div>
           <div class="svc-meta">${s.dur ? `⏱️ ${s.dur} min` : 'Sem duração definida'}</div>
+          ${svcMatsHTML(s)}
         </div>
         <div class="svc-price">${fmt(s.price)}</div>
         <div class="svc-actions">
@@ -975,10 +986,18 @@ function modalAtendimento() {
     <div class="field"><label>Cliente</label><input class="input" id="f_cli" list="clidl" placeholder="Nome da cliente"/><datalist id="clidl">${clopts}</datalist><span class="muted" style="font-size:12.5px">Cliente nova é cadastrada automaticamente ✨</span></div>
     <div class="field-row"><div class="field"><label>Valor (R$)</label><input class="input" id="f_val" type="number" step="0.01"/></div><div class="field"><label>Data</label><input class="input" id="f_date" type="date" value="${todayISO()}"/></div></div>
     <label class="row" style="gap:8px;font-size:14px"><input type="checkbox" id="f_baixa" checked style="width:auto"/> Dar baixa no material usado (serviços conhecidos)</label>
+    <div id="f_baixa_info" class="baixa-info"></div>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="f_save">Registrar</button>`);
   const findServ = () => state.services.find(s => s.name.toLowerCase() === $('#f_serv').value.trim().toLowerCase());
+  const baixaInfo = () => {
+    const box = $('#f_baixa_info'); if (!box) return;
+    const s = findServ();
+    const parts = (s && s.mat || []).map(([id, q]) => { const it = state.inventory.find(i => i.id === id); return it ? `${q}${it.unit ? ' ' + esc(it.unit) : ''} de ${esc(it.name)}` : ''; }).filter(Boolean);
+    box.innerHTML = parts.length ? `📉 Vai baixar do estoque: <b>${parts.join(', ')}</b>` : '';
+  };
   const svc0 = findServ(); if (svc0) $('#f_val').value = svc0.price;
-  $('#f_serv').oninput = () => { const s = findServ(); if (s) $('#f_val').value = s.price; };
+  baixaInfo();
+  $('#f_serv').oninput = () => { const s = findServ(); if (s) $('#f_val').value = s.price; baixaInfo(); };
   $('#f_save').onclick = () => {
     const servName = $('#f_serv').value.trim();
     const name = $('#f_cli').value.trim(); const val = parseFloat($('#f_val').value);
@@ -997,22 +1016,52 @@ function deduct(service) {
 }
 function modalServico(id) {
   const s = id ? state.services.find(x => x.id === id) : null;
+  const inv = state.inventory || [];
+  let mats = s && Array.isArray(s.mat) ? s.mat.map(m => [m[0], m[1]]) : [];   // cópia editável da receita
+  const invOpts = sel => inv.map(i => `<option value="${i.id}" ${i.id === sel ? 'selected' : ''}>${esc(i.name)}${i.unit ? ' (' + esc(i.unit) + ')' : ''}</option>`).join('');
   openModal(s ? '✏️ Editar serviço' : '💅 Novo serviço', `
     <div class="field"><label>Nome do serviço</label><input class="input" id="sv_name" placeholder="Ex.: Alongamento em gel" value="${s ? esc(s.name) : ''}"/></div>
     <div class="field-row">
       <div class="field"><label>Valor (R$)</label><input class="input" id="sv_price" type="number" step="0.01" min="0" value="${s ? s.price : ''}" placeholder="0,00"/></div>
       <div class="field"><label>Duração (min)</label><input class="input" id="sv_dur" type="number" min="0" step="5" value="${s && s.dur ? s.dur : ''}" placeholder="60"/></div>
     </div>
-    <p class="muted" style="font-size:12.5px">💡 Você pode editar o valor quando quiser, depois.</p>
+    <div class="field">
+      <label>📦 Materiais consumidos por aplicação</label>
+      <div id="sv_mats" class="sv-mats"></div>
+      <button type="button" class="btn btn-soft btn-sm" id="sv_addmat" style="margin-top:8px">➕ Adicionar material</button>
+      <p class="muted" style="font-size:12px;margin-top:8px">Coloque só o que é gasto <b>a cada atendimento</b> (gel, silicone pad, unha postiça…). Sempre que este serviço for registrado, o estoque baixa sozinho. 💡 Esmalte, que rende vários atendimentos, não precisa entrar aqui.</p>
+    </div>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="sv_save">${s ? 'Salvar' : 'Adicionar'}</button>`);
+  const invById = x => inv.find(i => i.id === x);
+  function renderMats() {
+    const box = $('#sv_mats'); if (!box) return;
+    if (!inv.length) { box.innerHTML = '<p class="muted" style="font-size:12.5px">Cadastre itens no <b>Estoque</b> primeiro pra poder vincular aqui.</p>'; return; }
+    if (!mats.length) { box.innerHTML = '<p class="muted" style="font-size:12.5px">Nenhum material vinculado ainda — clique em “Adicionar material”.</p>'; return; }
+    box.innerHTML = mats.map((m, idx) => {
+      const it = invById(m[0]); const unit = it ? (it.unit || 'un') : 'un';
+      return `<div class="sv-mat-row">
+        <select class="input sv-mat-item" data-idx="${idx}">${invOpts(m[0])}</select>
+        <input class="input sv-mat-qty" data-idx="${idx}" type="number" min="0" step="0.01" value="${m[1]}"/>
+        <span class="sv-mat-unit">${esc(unit)}</span>
+        <button type="button" class="ib ib-danger sv-mat-del" data-idx="${idx}" title="Remover material">✕</button>
+      </div>`;
+    }).join('');
+    box.querySelectorAll('.sv-mat-item').forEach(el => el.onchange = () => { mats[+el.dataset.idx][0] = el.value; renderMats(); });
+    box.querySelectorAll('.sv-mat-qty').forEach(el => el.oninput = () => { mats[+el.dataset.idx][1] = parseFloat(el.value) || 0; });
+    box.querySelectorAll('.sv-mat-del').forEach(el => el.onclick = () => { mats.splice(+el.dataset.idx, 1); renderMats(); });
+  }
+  renderMats();
+  const addBtn = $('#sv_addmat');
+  if (addBtn) addBtn.onclick = () => { if (!inv.length) return toast('Cadastre itens no Estoque primeiro 📦', 'warn'); mats.push([inv[0].id, 1]); renderMats(); };
   $('#sv_save').onclick = () => {
     const name = $('#sv_name').value.trim();
     const price = parseFloat($('#sv_price').value);
     const dur = parseInt($('#sv_dur').value, 10);
     if (!name) return toast('Informe o nome do serviço.', 'warn');
     if (!(price >= 0)) return toast('Informe um valor válido.', 'warn');
-    if (s) { s.name = name; s.price = price; s.dur = dur > 0 ? dur : (s.dur || 0); }
-    else { state.services.push({ id: 's_' + uid(), name, price, dur: dur > 0 ? dur : 60, mat: [] }); }
+    const cleanMats = mats.filter(m => m[0] && m[1] > 0).map(m => [m[0], +(+m[1]).toFixed(2)]);
+    if (s) { s.name = name; s.price = price; s.dur = dur > 0 ? dur : (s.dur || 0); s.mat = cleanMats; }
+    else { state.services.push({ id: 's_' + uid(), name, price, dur: dur > 0 ? dur : 60, mat: cleanMats }); }
     save(); closeModal(); render(); toast(s ? 'Serviço atualizado ✨' : 'Serviço adicionado 💅', 'ok');
   };
 }

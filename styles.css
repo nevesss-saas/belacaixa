@@ -443,7 +443,21 @@ textarea{resize:vertical;min-height:70px}
 .svc-name{font-weight:700;font-size:15px;word-break:break-word}
 .svc-meta{font-size:12px;color:var(--ink-3);margin-top:2px}
 .svc-price{font-family:var(--display);font-weight:800;font-size:18px;color:var(--violet);white-space:nowrap}
-.svc-actions{display:flex;gap:6px;flex:0 0 auto}
+.svc-actions{display:flex;gap:6px;flex:0 0 auto;align-self:flex-start}
+/* receita de materiais do serviço */
+.svc-card{align-items:flex-start}
+.svc-recipe{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.svc-mat{font-size:11px;font-weight:600;color:var(--violet);background:#f3e8ff;border:1px solid #e6d4ff;border-radius:999px;padding:3px 9px}
+.svc-mat-none{color:var(--ink-3);background:#f4f0f6;border-color:var(--line);font-weight:500}
+/* editor de materiais no modal de serviço */
+.sv-mats{display:flex;flex-direction:column;gap:8px}
+.sv-mat-row{display:flex;align-items:center;gap:8px}
+.sv-mat-row .sv-mat-item{flex:1;min-width:0}
+.sv-mat-row .sv-mat-qty{width:84px;flex:0 0 auto}
+.sv-mat-unit{font-size:12.5px;color:var(--ink-3);flex:0 0 auto;min-width:30px}
+/* aviso de baixa no registro de atendimento */
+.baixa-info{font-size:12.5px;color:var(--violet);margin-top:8px;line-height:1.4}
+.baixa-info:empty{display:none}
 
 /* ---- botões WhatsApp na agenda ---- */
 .appt-acts{gap:6px;flex-wrap:wrap;justify-content:flex-end}
