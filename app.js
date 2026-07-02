@@ -382,12 +382,12 @@ function patrimonioSeries() {
 /* ============================================================
    UI HELPERS — toast / modal
    ============================================================ */
-function toast(msg, type = 'info') {
+function toast(msg, type = 'info', dur = 3200) {
   const el = document.createElement('div');
   el.className = 'toast ' + (type === 'ok' ? 'ok' : type === 'warn' ? 'warn' : 'info');
   el.innerHTML = `<span>${type === 'ok' ? '✅' : type === 'warn' ? '⚠️' : '💡'}</span><span>${msg}</span>`;
   $('#toastRoot').appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(40px)'; el.style.transition = '.3s'; setTimeout(() => el.remove(), 300); }, 3200);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(40px)'; el.style.transition = '.3s'; setTimeout(() => el.remove(), 300); }, dur);
 }
 function openModal(title, body, foot) {
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-close-bg>
@@ -971,6 +971,19 @@ function render() {
   v.init && v.init();
   $$('#navMenu .nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === currentView));
   $('#bizName').textContent = state.business.name;
+  updateStockBadge();
+}
+// selo vermelho no menu 📦 Estoque com o nº de itens a repor (sempre visível)
+function updateStockBadge() {
+  const btn = document.querySelector('#navMenu .nav-item[data-view="estoque"]');
+  if (!btn) return;
+  const n = (state && Array.isArray(state.inventory)) ? lowStock().length : 0;
+  let badge = btn.querySelector('.ni-badge');
+  if (n > 0) {
+    if (!badge) { badge = document.createElement('span'); badge.className = 'ni-badge'; btn.appendChild(badge); }
+    badge.textContent = n;
+    badge.title = n + ' item(ns) precisam repor';
+  } else if (badge) { badge.remove(); }
 }
 function setView(v) { currentView = v; $('.sidebar')?.classList.remove('open'); render(); window.scrollTo(0, 0); }
 
@@ -1012,7 +1025,20 @@ function modalAtendimento() {
   };
 }
 function deduct(service) {
-  (service.mat || []).forEach(([id, q]) => { const it = state.inventory.find(i => i.id === id); if (it) it.qty = Math.max(0, +(it.qty - q).toFixed(2)); });
+  const hitMin = [];
+  (service.mat || []).forEach(([id, q]) => {
+    const it = state.inventory.find(i => i.id === id);
+    if (!it) return;
+    const before = it.qty;
+    it.qty = Math.max(0, +(it.qty - q).toFixed(2));
+    const cruzouMin = before > it.min && it.qty <= it.min;      // caiu no/abaixo do mínimo agora
+    const zerouAgora = before > 0 && it.qty <= 0;               // esgotou nesta baixa (mesmo se já estava baixo)
+    if (cruzouMin || zerouAgora) hitMin.push(it);
+  });
+  if (hitMin.length) {
+    const parts = hitMin.map(it => it.qty <= 0 ? `${esc(it.name)} (zerou!)` : `${esc(it.name)} (${it.qty} ${esc(it.unit)}, mín ${it.min})`);
+    toast('Estoque no limite — hora de repor 📦: ' + parts.join(' · '), 'warn', 6500);
+  }
 }
 function modalServico(id) {
   const s = id ? state.services.find(x => x.id === id) : null;
