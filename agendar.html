@@ -74,6 +74,12 @@
         <p>Esse link de agendamento parece inválido ou expirou. Peça um novo pro salão. 💜</p>
       </div>
 
+      <!-- carregando (link curto busca os dados) -->
+      <div id="loadView" class="err-box hidden">
+        <div class="em">⏳</div>
+        <p>Carregando os serviços…</p>
+      </div>
+
       <!-- formulário -->
       <div id="formView" class="hidden">
         <div class="hero">
@@ -143,13 +149,28 @@
       return p[2]+'/'+p[1]+'/'+p[0] + ' (' + dias[d.getDay()] + ')';
     }
 
-    var data = decodeToken((location.hash || '').replace(/^#/, ''));
     var errView = document.getElementById('errView');
     var formView = document.getElementById('formView');
+    var loadView = document.getElementById('loadView');
+    function showErr(){ if(loadView) loadView.classList.add('hidden'); if(formView) formView.classList.add('hidden'); errView.classList.remove('hidden'); }
+    function fetchBooking(sid){
+      var base = 'https://uxrhoxpvdygjfegashdu.supabase.co';
+      return fetch(base + '/functions/v1/booking-info?s=' + encodeURIComponent(sid))
+        .then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
+    }
+    var okData = function(d){ return d && d.w && Array.isArray(d.s) && d.s.length; };
 
-    if(!data || !data.w || !Array.isArray(data.s) || !data.s.length){
-      errView.classList.remove('hidden');
-    } else {
+    var sid = new URLSearchParams(location.search).get('s');
+    if (sid) {                                   // link CURTO e estável (?s=<id do salão>)
+      loadView.classList.remove('hidden');
+      fetchBooking(sid).then(function(d){ okData(d) ? boot(d) : showErr(); });
+    } else {                                     // reserva: dados embutidos no #token
+      var d0 = decodeToken((location.hash || '').replace(/^#/, ''));
+      okData(d0) ? boot(d0) : showErr();
+    }
+
+    function boot(data){
+      if(loadView) loadView.classList.add('hidden');
       formView.classList.remove('hidden');
       var biz = data.b || 'Salão';
       var wa = data.w;

@@ -1282,37 +1282,15 @@ function consumeBookingDeepLink() {
 function bookingLink() {
   const wa = waPhone(state.business && state.business.whatsapp);
   if (!wa) return null;
+  // Link CURTO e estável: a página busca os dados ao vivo pelo id do salão.
+  // Curto = o WhatsApp linka a URL inteira; estável = sempre reflete os serviços atuais.
+  if (typeof currentUser !== 'undefined' && currentUser && currentUser.id) {
+    return bookingBaseUrl() + '?s=' + currentUser.id;
+  }
+  // Fallback (ex.: demonstração sem login): embute os dados no próprio link.
   const svc = (state.services || []).map(s => [s.name, s.price, s.dur || 60]);
   const token = encodeBooking({ b: (state.business.name || 'Meu salão'), w: wa, s: svc });
   return bookingBaseUrl() + '#' + token;
-}
-// Desenha o QR do link DESTE salão num canvas (gerado no navegador, nada sai pra fora).
-// Retorna true se conseguiu. Cada QR carrega só o token público do salão logado.
-function renderBookingQR(canvas, link, salonName) {
-  if (!canvas || typeof qrcode !== 'function') return false;
-  let qr;
-  try { qr = qrcode(0, 'L'); qr.addData(link); qr.make(); } catch (e) { return false; }
-  const count = qr.getModuleCount();
-  const cell = 6, quiet = 4, pad = 26, capH = 58;
-  const qpx = (count + quiet * 2) * cell;
-  const W = qpx + pad * 2, H = pad + qpx + 20 + capH;
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#111111';                                  // preto sólido = leitura confiável
-  const mx = pad + quiet * cell, my = pad + quiet * cell;
-  for (let r = 0; r < count; r++) for (let c = 0; c < count; c++) {
-    if (qr.isDark(r, c)) ctx.fillRect(mx + c * cell, my + r * cell, cell, cell);
-  }
-  const cy = pad + qpx + 34;
-  ctx.textAlign = 'center';
-  let fs = 22; const name = String(salonName || 'Agende seu horário');
-  ctx.font = '700 ' + fs + 'px Poppins, Inter, sans-serif';
-  while (ctx.measureText(name).width > W - pad * 2 && fs > 12) { fs--; ctx.font = '700 ' + fs + 'px Poppins, Inter, sans-serif'; }
-  ctx.fillStyle = '#9b5de5'; ctx.fillText(name, W / 2, cy);
-  ctx.fillStyle = '#8b849b'; ctx.font = '600 14px Inter, sans-serif';
-  ctx.fillText('Aponte a câmera e agende seu horário', W / 2, cy + 26);
-  return true;
 }
 function modalLinkAgendamento() {
   const wa = waPhone(state.business && state.business.whatsapp);
@@ -1338,31 +1316,13 @@ function modalLinkAgendamento() {
       <a class="btn btn-soft btn-sm" href="${esc(link)}" target="_blank" rel="noopener">👀 Testar página</a>
       <a class="btn btn-wa btn-sm" href="${waLink(wa, share)}" target="_blank" rel="noopener">📲 Enviar pra mim</a>
     </div>
-    <div id="lk_qrwrap" style="text-align:center;margin-top:18px" hidden>
-      <canvas id="lk_qr" style="width:220px;max-width:72%;height:auto;border:1px solid var(--line);border-radius:14px"></canvas>
-      <div><button class="btn btn-soft btn-sm" id="lk_dl" style="margin-top:10px">📱 Baixar QR Code</button></div>
-      <p class="muted" style="font-size:12.5px;margin-top:6px">Imprima no balcão ou poste no story — a cliente aponta a câmera e cai no <b>seu</b> link. Este QR é só do seu salão.</p>
-    </div>
-    <p class="muted" style="margin-top:12px;font-size:13px">💡 O pedido entra como <b>agendado</b> (pendente). O estoque só baixa e a receita só entra quando você marca o atendimento como <b>concluído</b> — nunca de um horário que a cliente ainda não compareceu.</p>
+    <p class="muted" style="margin-top:12px;font-size:13px">🔗 O link é <b>curto e fixo</b> — pode divulgar à vontade. A página mostra sempre os seus serviços atuais.</p>
+    <p class="muted" style="margin-top:6px;font-size:13px">💡 O pedido entra como <b>agendado</b> (pendente). O estoque só baixa e a receita só entra quando você marca o atendimento como <b>concluído</b> — nunca de um horário que a cliente ainda não compareceu.</p>
   `, `<button class="btn btn-ghost" data-close>Fechar</button>`);
   $('#lk_copy').onclick = async () => {
     try { await navigator.clipboard.writeText(link); toast('Link copiado! Cole no seu Instagram/status 💜', 'ok'); }
     catch (e) { const i = $('#lk_url'); i.select(); try { document.execCommand('copy'); } catch (_) {} toast('Link copiado!', 'ok'); }
   };
-  // QR do link deste salão (desenhado no navegador; nada é enviado pra fora)
-  const canvas = $('#lk_qr');
-  if (renderBookingQR(canvas, link, state.business.name)) {
-    $('#lk_qrwrap').hidden = false;
-    $('#lk_dl').onclick = () => {
-      try {
-        const slug = (state.business.name || 'salao').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'salao';
-        const a = document.createElement('a');
-        a.href = canvas.toDataURL('image/png'); a.download = 'qr-agendamento-' + slug + '.png';
-        document.body.appendChild(a); a.click(); a.remove();
-        toast('QR Code baixado! Já pode imprimir 📱', 'ok');
-      } catch (e) { toast('Não consegui baixar o QR agora. 😕', 'warn'); }
-    };
-  }
 }
 function modalBiz() {
   const b = state.business;
