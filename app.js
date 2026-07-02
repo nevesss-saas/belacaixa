@@ -579,7 +579,10 @@ VIEWS.agenda = {
         ${miniStat('✅', 'Concluídos', concluded)}
         ${miniStat('⏰', 'Próximo horário livre', nextSlot.label)}
       </div>
-      <button class="btn btn-primary" data-act="new-agenda">＋ Agendar</button>
+      <div class="row" style="gap:8px">
+        <button class="btn btn-outline" data-act="link-agenda">🔗 Link de agendamento</button>
+        <button class="btn btn-primary" data-act="new-agenda">＋ Agendar</button>
+      </div>
     </div>
 
     <div class="insight tone-violet mt" style="max-width:none"><div class="ins-ico" style="background:#f3e8ff">🤖</div>
@@ -1221,16 +1224,69 @@ function modalPedido() {
     save(); closeModal(); render(); toast('Pedido realizado! Estoque reposto 📦', 'ok');
   };
 }
+/* ---------- LINK PÚBLICO DE AGENDAMENTO (enxuto, sem Cloud API) ----------
+   A cliente abre a página agendar.html, escolhe serviço/dia/horário e o pedido
+   cai no WhatsApp do salão. Nada é gravado sem o dono confirmar → o agendamento
+   entra "agendado" (pendente); estoque/receita só na conclusão. */
+function bookingBaseUrl() {
+  // agendar.html fica ao lado do index.html, na mesma pasta publicada
+  return new URL('agendar.html', location.href).href.split('#')[0].split('?')[0];
+}
+function encodeBooking(obj) {
+  // base64url do JSON em UTF-8 — só dados públicos (nome do salão, WhatsApp, serviços)
+  const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function bookingLink() {
+  const wa = waPhone(state.business && state.business.whatsapp);
+  if (!wa) return null;
+  const svc = (state.services || []).map(s => [s.name, s.price, s.dur || 60]);
+  const token = encodeBooking({ b: (state.business.name || 'Meu salão'), w: wa, s: svc });
+  return bookingBaseUrl() + '#' + token;
+}
+function modalLinkAgendamento() {
+  const wa = waPhone(state.business && state.business.whatsapp);
+  if (!wa) {
+    openModal('🔗 Link de agendamento', `<p>Pra gerar seu link, cadastre primeiro o <b>WhatsApp do salão</b> — é pra lá que as clientes vão mandar os pedidos de horário.</p>`,
+      `<button class="btn btn-ghost" data-close>Depois</button><button class="btn btn-primary" id="lk_cfg">Cadastrar WhatsApp agora</button>`);
+    $('#lk_cfg').onclick = () => { closeModal(); modalBiz(); };
+    return;
+  }
+  if (!(state.services || []).length) {
+    openModal('🔗 Link de agendamento', `<p>Cadastre pelo menos um <b>serviço</b> antes de divulgar o link — é o que a cliente escolhe na hora de agendar.</p>`,
+      `<button class="btn btn-ghost" data-close>Fechar</button><button class="btn btn-primary" id="lk_svc">Ir para Serviços</button>`);
+    $('#lk_svc').onclick = () => { closeModal(); setView('servicos'); };
+    return;
+  }
+  const link = bookingLink();
+  const share = `Oi! 💅 Agende seu horário na ${state.business.name} por aqui, é rapidinho: ${link}`;
+  openModal('🔗 Seu link de agendamento', `
+    <p>Coloque esse link no seu <b>Instagram</b>, status do WhatsApp ou mande pras clientes. Elas escolhem serviço, dia e horário, e o pedido chega direto no seu WhatsApp <b>${fmtWa(wa)}</b> — você confirma e agenda. 😊</p>
+    <div class="field"><label>Seu link</label><input class="input" id="lk_url" readonly value="${esc(link)}" onclick="this.select()"/></div>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" id="lk_copy">📋 Copiar link</button>
+      <a class="btn btn-soft btn-sm" href="${esc(link)}" target="_blank" rel="noopener">👀 Testar página</a>
+      <a class="btn btn-wa btn-sm" href="${waLink(wa, share)}" target="_blank" rel="noopener">📲 Enviar pra mim</a>
+    </div>
+    <p class="muted" style="margin-top:12px;font-size:13px">💡 O pedido entra como <b>agendado</b> (pendente). O estoque só baixa e a receita só entra quando você marca o atendimento como <b>concluído</b> — nunca de um horário que a cliente ainda não compareceu.</p>
+  `, `<button class="btn btn-ghost" data-close>Fechar</button>`);
+  $('#lk_copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(link); toast('Link copiado! Cole no seu Instagram/status 💜', 'ok'); }
+    catch (e) { const i = $('#lk_url'); i.select(); try { document.execCommand('copy'); } catch (_) {} toast('Link copiado!', 'ok'); }
+  };
+}
 function modalBiz() {
   const b = state.business;
   openModal('Configurações do negócio', `
     <div class="field"><label>Nome do negócio</label><input class="input" id="g_name" value="${esc(b.name)}"/></div>
+    <div class="field"><label>📲 WhatsApp do salão <span class="muted" style="font-weight:400">(pra receber os agendamentos das clientes)</span></label><input class="input" id="g_wa" inputmode="tel" placeholder="Ex.: (22) 99244-5995" value="${esc(b.whatsapp || '')}"/></div>
     <div class="field-row"><div class="field"><label>Reserva de emergência alvo (R$)</label><input class="input" id="g_res" type="number" value="${b.reserveTarget}"/></div><div class="field"><label>Meta de faturamento mensal (R$)</label><input class="input" id="g_goal" type="number" value="${b.monthlyGoal}"/></div></div>
     <hr style="border:none;border-top:1px solid var(--line);margin:8px 0 14px">
     <button class="btn btn-danger btn-sm" id="g_reset">↺ Restaurar dados de demonstração</button>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="g_save">Salvar</button>`);
   $('#g_save').onclick = () => {
     b.name = $('#g_name').value.trim() || b.name; b.reserveTarget = +$('#g_res').value || b.reserveTarget; b.monthlyGoal = +$('#g_goal').value || b.monthlyGoal;
+    b.whatsapp = waPhone($('#g_wa').value);
     save(); closeModal(); render(); toast('Configurações salvas.', 'ok');
   };
   $('#g_reset').onclick = () => { if (confirm('Isso substitui seus dados pelos de demonstração. Continuar?')) { state = seed(); save(); closeModal(); render(); toast('Dados de demonstração carregados.', 'info'); } };
@@ -1245,6 +1301,7 @@ const ACTIONS = {
   'new-saida': () => modalTx('out'),
   'new-cliente': modalCliente,
   'new-agenda': () => modalAgenda(),
+  'link-agenda': modalLinkAgendamento,
   'new-servico': () => modalServico(),
   'edit-servico': (id) => modalServico(id),
   'del-servico': (id) => { if (confirm('Excluir este serviço?')) { state.services = state.services.filter(s => s.id !== id); save(); render(); toast('Serviço removido.', 'info'); } },
