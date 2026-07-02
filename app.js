@@ -1375,6 +1375,8 @@ async function startCheckout(plan, btn) {
    ============================================================ */
 async function enterApp() {
   if (!currentUser) { showAuth('login'); return; }
+  demoMode = false;                                             // login de verdade encerra a demonstração
+  { const bar = $('#demoBar'); if (bar) bar.hidden = true; }    // e tira a barra "Você está na demonstração"
   $('#landing').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#app').hidden = false;
   document.body.style.background = 'var(--bg)';
   if (!state) { $('#viewRoot').innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Carregando seus dados…</div>'; await cloudLoad(); }
