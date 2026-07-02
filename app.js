@@ -215,6 +215,15 @@ function daysToDeplete(item) {
   return Math.floor(item.qty / perDay);
 }
 function bestOffer(itemId) { return state.market.filter(m => m.itemId === itemId).sort((a, b) => a.price - b.price)[0]; }
+// lista de compras sugerida p/ os itens no/abaixo do mínimo (qtd sugerida + melhor preço)
+function pedidoItens() {
+  return lowStock().map(it => {
+    const off = bestOffer(it.id); const price = off ? off.price : it.cost;
+    const qty = Math.max(it.min, Math.ceil(it.min * 2 - it.qty));
+    return { it, off, price, qty, sub: +(qty * price).toFixed(2) };
+  });
+}
+function pedidoTotal() { return pedidoItens().reduce((s, r) => s + r.sub, 0); }
 
 /* ============================================================
    IA — INSIGHTS / ASSISTENTE / INVESTIMENTOS
@@ -382,12 +391,19 @@ function patrimonioSeries() {
 /* ============================================================
    UI HELPERS — toast / modal
    ============================================================ */
-function toast(msg, type = 'info', dur = 3200) {
+function toast(msg, type = 'info', dur = 3200, action = null) {
   const el = document.createElement('div');
   el.className = 'toast ' + (type === 'ok' ? 'ok' : type === 'warn' ? 'warn' : 'info');
   el.innerHTML = `<span>${type === 'ok' ? '✅' : type === 'warn' ? '⚠️' : '💡'}</span><span>${msg}</span>`;
+  const kill = () => { el.style.opacity = '0'; el.style.transform = 'translateX(40px)'; el.style.transition = '.3s'; setTimeout(() => el.remove(), 300); };
+  if (action && action.label) {
+    const btn = document.createElement('button');
+    btn.className = 'toast-act'; btn.textContent = action.label;
+    btn.onclick = () => { kill(); try { action.onClick(); } catch (e) {} };
+    el.appendChild(btn);
+  }
   $('#toastRoot').appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(40px)'; el.style.transition = '.3s'; setTimeout(() => el.remove(), 300); }, dur);
+  setTimeout(kill, dur);
 }
 function openModal(title, body, foot) {
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-close-bg>
@@ -630,9 +646,13 @@ VIEWS.estoque = {
       ${miniStat('🛒', 'Promoções ativas', state.market.length)}
     </div><div class="row"><button class="btn btn-outline" data-act="new-item">＋ Item</button><button class="btn btn-primary" data-act="gerar-pedido">🤖 Gerar pedido</button></div></div>
 
-    ${low.length ? `<div class="insight tone-amber mt" style="max-width:none"><div class="ins-ico" style="background:#fef3df">🤖</div>
-      <div><h4>Hora de repor ${low.length} item(ns)</h4><p>Pelo seu ritmo de atendimentos, ${esc(low[0].name)} acaba em ~${daysToDeplete(low[0])} dia(s). Já encontrei os melhores preços no mercado.</p>
-      <button class="btn btn-soft btn-sm" style="margin-top:8px" data-act="gerar-pedido">Montar lista de compras →</button></div></div>` : ''}
+    ${low.length ? `<div class="insight tone-amber mt" style="max-width:none"><div class="ins-ico" style="background:#fef3df">🛒</div>
+      <div style="flex:1">
+        <div class="row between" style="align-items:baseline"><h4>Repor ${low.length} item(ns)</h4><b style="font-family:var(--display);color:var(--violet)">${fmt(pedidoTotal())}</b></div>
+        <p>Estão no/abaixo do mínimo. Clique num item pra repor, ou monte a lista toda (já nos melhores preços).</p>
+        <div class="repor-chips">${low.map(it => `<button class="repor-chip ${it.qty <= 0 ? 'is-zero' : ''}" data-act="repor-item" data-id="${it.id}" title="Repor ${esc(it.name)}">${it.qty <= 0 ? '🚨' : '📦'} ${esc(it.name)} · <b>${it.qty}</b>/${it.min} ${esc(it.unit)}</button>`).join('')}</div>
+        <button class="btn btn-primary btn-sm" style="margin-top:12px" data-act="gerar-pedido">🤖 Montar lista de compras (${fmt(pedidoTotal())}) →</button>
+      </div></div>` : ''}
 
     <div class="grid cols-2 mt">
       <div class="card">
@@ -1037,7 +1057,9 @@ function deduct(service) {
   });
   if (hitMin.length) {
     const parts = hitMin.map(it => it.qty <= 0 ? `${esc(it.name)} (zerou!)` : `${esc(it.name)} (${it.qty} ${esc(it.unit)}, mín ${it.min})`);
-    toast('Estoque no limite — hora de repor 📦: ' + parts.join(' · '), 'warn', 6500);
+    const um = hitMin.length === 1 ? hitMin[0] : null;
+    const act = { label: um ? 'Repor' : 'Ver lista', onClick: () => um ? modalRepor(um.id) : modalPedido() };
+    toast('Estoque no limite — hora de repor 📦: ' + parts.join(' · '), 'warn', 6500, act);
   }
 }
 function modalServico(id) {
@@ -1184,14 +1206,9 @@ function modalRepor(id) {
   };
 }
 function modalPedido() {
-  const low = lowStock();
-  if (!low.length) { toast('Estoque saudável — nada para comprar agora ✅', 'ok'); return; }
-  let total = 0;
-  const rows = low.map(it => {
-    const off = bestOffer(it.id); const price = off ? off.price : it.cost; const qty = Math.max(it.min, Math.ceil(it.min * 2 - it.qty));
-    const sub = qty * price; total += sub;
-    return { it, off, price, qty, sub };
-  });
+  const rows = pedidoItens();
+  if (!rows.length) { toast('Estoque saudável — nada para comprar agora ✅', 'ok'); return; }
+  const total = rows.reduce((s, r) => s + r.sub, 0);
   openModal('🤖 Pedido de compra sugerido', `
     <p class="muted" style="margin-bottom:14px">A IA montou este pedido com os itens abaixo do mínimo, já nos melhores preços encontrados:</p>
     <table class="tbl"><thead><tr><th>Item</th><th>Fornecedor</th><th class="num">Qtd</th><th class="num">Subtotal</th></tr></thead>

@@ -268,7 +268,14 @@ textarea{resize:vertical;min-height:70px}
 .toast.ok{background:linear-gradient(120deg,#0e9c79,#00b389)}
 .toast.warn{background:linear-gradient(120deg,#d97706,#f59e0b)}
 .toast.info{background:var(--grad)}
+.toast-act{margin-left:6px;flex:0 0 auto;background:rgba(255,255,255,.22);color:#fff;font-weight:800;font-size:12.5px;padding:6px 12px;border-radius:9px;white-space:nowrap;transition:.15s}
+.toast-act:hover{background:rgba(255,255,255,.36)}
 @keyframes slidein{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
+/* chips de reposição no topo do Estoque */
+.repor-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.repor-chip{font-size:12.5px;font-weight:600;color:#b45309;background:#fff;border:1px solid #f4d9a8;border-radius:999px;padding:6px 12px;transition:.15s}
+.repor-chip:hover{background:#fff7ec;border-color:#e0a94f;transform:translateY(-1px)}
+.repor-chip.is-zero{color:var(--red);border-color:#f3bcbc;background:#fff5f5}
 
 /* ---------- chat ---------- */
 .chat{display:flex;flex-direction:column;height:calc(100vh - 230px);min-height:440px}
