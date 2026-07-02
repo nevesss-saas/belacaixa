@@ -123,6 +123,9 @@
       return d;
     }
     function waLink(phone, text){ return 'https://wa.me/' + waPhone(phone) + '?text=' + encodeURIComponent(text); }
+    // link "1 toque p/ agendar" que o DONO (logado) abre pra pré-preencher a agenda
+    function encodeBk(obj){ var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(obj)))); return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+    function appBase(){ return location.href.replace(/agendar\.html.*$/i, ''); }
     function money(v){ return 'R$ ' + Number(v||0).toFixed(2).replace('.', ','); }
     function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
     function decodeToken(t){
@@ -197,6 +200,8 @@
         if(!time){ alert('Escolha o horário.'); return; }
         if(!name){ alert('Diz seu nome pro salão saber quem é 😊'); document.getElementById('fName').focus(); return; }
 
+        var deep = appBase() + '?ag=' + encodeBk({ n:name, p:phone, s:svc[0], d:date, t:time, o:note });
+
         var msg = 'Oi! Quero agendar um horário 💅\n\n' +
           '• Serviço: ' + svc[0] + ' — ' + money(svc[1]) + '\n' +
           '• Data: ' + brDate(date) + '\n' +
@@ -204,7 +209,8 @@
           '• Nome: ' + name +
           (phone ? '\n• WhatsApp: ' + phone : '') +
           (note ? '\n• Obs: ' + note : '') +
-          '\n\nPode confirmar pra mim? 😊';
+          '\n\nPode confirmar pra mim? 😊' +
+          '\n——\n📲 (salão) agendar em 1 toque: ' + deep;
 
         var url = waLink(wa, msg);
         fallbackLink.href = url;

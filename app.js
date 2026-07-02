@@ -1143,11 +1143,14 @@ function modalCliente() {
   };
 }
 function modalAgenda(pre) {
-  const slot = pre || suggestSlot();
-  const opts = state.services.map(s => `<option value="${s.id}">${esc(s.name)} — ${fmt(s.price)}</option>`).join('');
+  const p = pre || {};
+  const slot = { iso: p.iso, time: p.time };
+  if (!slot.iso || !slot.time) { const sg = suggestSlot(); slot.iso = slot.iso || sg.iso; slot.time = slot.time || sg.time; }
+  const opts = state.services.map(s => `<option value="${s.id}"${p.serviceId === s.id ? ' selected' : ''}>${esc(s.name)} — ${fmt(s.price)}</option>`).join('');
   const clopts = state.clients.map(c => `<option value="${esc(c.name)}">`).join('');
   openModal('Agendar atendimento', `
-    <div class="field"><label>Cliente</label><input class="input" id="a_cli" list="adl" placeholder="Nome da cliente"/><datalist id="adl">${clopts}</datalist></div>
+    ${p.fromLink ? `<div class="insight tone-violet" style="margin:0 0 12px;max-width:none"><div class="ins-ico" style="background:#f3e8ff">📲</div><div><h4 style="margin:0">Pedido pelo seu link 💜</h4><p style="margin:2px 0 0">Confira os dados e toque em <b>Agendar</b> pra confirmar.${p.note ? '<br><b>Obs. da cliente:</b> ' + esc(p.note) : ''}</p></div></div>` : ''}
+    <div class="field"><label>Cliente</label><input class="input" id="a_cli" list="adl" placeholder="Nome da cliente" value="${p.cli ? esc(p.cli) : ''}"/><datalist id="adl">${clopts}</datalist></div>
     <div class="field"><label>Serviço</label><select id="a_serv">${opts}</select></div>
     <div class="field-row"><div class="field"><label>Data</label><input class="input" id="a_date" type="date" value="${slot.iso}"/></div><div class="field"><label>Horário</label><input class="input" id="a_time" type="time" value="${slot.time}"/></div></div>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="a_save">Agendar</button>`);
@@ -1155,7 +1158,8 @@ function modalAgenda(pre) {
     const name = $('#a_cli').value.trim(); if (!name) return toast('Informe a cliente.', 'warn');
     const sv = state.services.find(s => s.id === $('#a_serv').value);
     let cli = state.clients.find(c => c.name.toLowerCase() === name.toLowerCase());
-    if (!cli) { cli = { id: 'c_' + uid(), name, phone: '', birthday: '', notes: '', createdAt: todayISO() }; state.clients.push(cli); }
+    if (!cli) { cli = { id: 'c_' + uid(), name, phone: p.phone || '', birthday: '', notes: '', createdAt: todayISO() }; state.clients.push(cli); }
+    else if (p.phone && !cli.phone) { cli.phone = p.phone; }
     state.appointments.push({ id: uid(), date: $('#a_date').value, time: $('#a_time').value, serviceId: sv.id, serviceName: sv.name, clientId: cli.id, clientName: cli.name, price: sv.price, status: 'agendado' });
     save(); closeModal(); render(); toast('Atendimento agendado 📅', 'ok');
   };
@@ -1236,6 +1240,25 @@ function encodeBooking(obj) {
   // base64url do JSON em UTF-8 — só dados públicos (nome do salão, WhatsApp, serviços)
   const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
   return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function decodeBooking(str) {
+  try {
+    let b64 = String(str).replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    return JSON.parse(decodeURIComponent(escape(atob(b64))));
+  } catch (e) { return null; }
+}
+/* Consome o link "1 toque p/ agendar" (?ag=...) que veio da agendar.html:
+   abre o modal de agendamento JÁ preenchido. NADA é gravado até o dono tocar
+   "Agendar" → o atendimento entra pendente (status 'agendado'). */
+function consumeBookingDeepLink() {
+  const raw = new URLSearchParams(location.search).get('ag');
+  if (!raw || !state) return;
+  history.replaceState({}, '', location.pathname);   // limpa a URL (não reabre no refresh)
+  const b = decodeBooking(raw);
+  if (!b || !b.s) { toast('Não consegui ler esse pedido de agendamento. 😕', 'warn'); return; }
+  const sv = (state.services || []).find(s => s.name.toLowerCase() === String(b.s).toLowerCase());
+  modalAgenda({ iso: b.d, time: b.t, cli: b.n, phone: b.p, serviceId: sv ? sv.id : '', note: b.o, fromLink: true });
 }
 function bookingLink() {
   const wa = waPhone(state.business && state.business.whatsapp);
@@ -1564,6 +1587,7 @@ async function enterApp() {
   const adm = $('#navAdmin'); if (adm) adm.hidden = !isAdmin();
   if (isAdmin()) { const chip = $('#sbPlanChip'); if (chip) chip.textContent = '🛡️ ADMIN'; }
   render(); window.scrollTo(0, 0);
+  consumeBookingDeepLink();   // se veio de um link "1 toque p/ agendar", abre o modal já preenchido
 }
 function exitApp() { $('#app').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#landing').hidden = false; document.body.style.background = ''; window.scrollTo(0, 0); }
 
