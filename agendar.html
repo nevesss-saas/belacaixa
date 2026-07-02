@@ -101,6 +101,7 @@
               <input class="input" type="time" id="fTime" value="10:00" />
             </div>
           </div>
+          <p id="busyHint" style="display:none;margin:8px 2px 0;font-size:12.5px;color:#b9770f"></p>
 
           <label class="lbl">Seu nome <span class="req">*</span></label>
           <input class="input" id="fName" placeholder="Como o salão vai te chamar" autocomplete="name" />
@@ -153,9 +154,10 @@
     var formView = document.getElementById('formView');
     var loadView = document.getElementById('loadView');
     function showErr(){ if(loadView) loadView.classList.add('hidden'); if(formView) formView.classList.add('hidden'); errView.classList.remove('hidden'); }
+    var SB_URL = 'https://uxrhoxpvdygjfegashdu.supabase.co';
+    function hhmmToMin(t){ var p = String(t||'').split(':'); return (+p[0]||0)*60 + (+p[1]||0); }
     function fetchBooking(sid){
-      var base = 'https://uxrhoxpvdygjfegashdu.supabase.co';
-      return fetch(base + '/functions/v1/booking-info?s=' + encodeURIComponent(sid))
+      return fetch(SB_URL + '/functions/v1/booking-info?s=' + encodeURIComponent(sid))
         .then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
     }
     var okData = function(d){ return d && d.w && Array.isArray(d.s) && d.s.length; };
@@ -181,6 +183,28 @@
       var today = new Date(); var iso = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
       var fDate = document.getElementById('fDate');
       fDate.min = iso; fDate.value = iso;
+
+      // horários já ocupados nesse dia (evita 2 clientes no mesmo horário) — só p/ link ?s=
+      var busySlots = [], busyDate = '';
+      var busyHint = document.getElementById('busyHint');
+      function renderBusyHint(){
+        if(!busyHint) return;
+        if(busySlots.length){
+          var times = busySlots.map(function(b){ return b[0]; }).sort();
+          busyHint.innerHTML = '⛔ Já reservado nesse dia: <b>'+times.join(' · ')+'</b>';
+          busyHint.style.display = 'block';
+        } else { busyHint.style.display = 'none'; }
+      }
+      function loadBusy(dt){
+        busySlots = []; busyDate = dt; renderBusyHint();
+        if(!sid || !dt) return;
+        fetch(SB_URL + '/functions/v1/booking-info?s=' + encodeURIComponent(sid) + '&date=' + dt)
+          .then(function(r){ return r.ok ? r.json() : null; })
+          .then(function(d){ if(d && Array.isArray(d.busy) && busyDate===dt){ busySlots = d.busy; renderBusyHint(); } })
+          .catch(function(){});
+      }
+      fDate.addEventListener('change', function(){ loadBusy(fDate.value); });
+      loadBusy(fDate.value);
 
       // lista de serviços (radio cards)
       var list = document.getElementById('svcList');
@@ -220,6 +244,13 @@
         if(!date){ alert('Escolha o dia.'); return; }
         if(!time){ alert('Escolha o horário.'); return; }
         if(!name){ alert('Diz seu nome pro salão saber quem é 😊'); document.getElementById('fName').focus(); return; }
+
+        // evita pedir um horário que já está reservado nesse dia
+        if(busyDate === date && busySlots.length){
+          var cs = hhmmToMin(time), ce = cs + (svc[2] || 60);
+          var clash = busySlots.some(function(b){ var bs = hhmmToMin(b[0]), be = bs + (b[1] || 60); return cs < be && bs < ce; });
+          if(clash){ alert('Ops! O horário ' + time + ' já está reservado nesse dia 😅\nEscolha outro, por favor 💜'); return; }
+        }
 
         var deep = appBase() + '?ag=' + encodeBk({ n:name, p:phone, s:svc[0], d:date, t:time, o:note });
 

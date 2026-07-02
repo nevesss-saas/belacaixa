@@ -1158,6 +1158,17 @@ function findClientByContact(name, phone) {
   if (ln) return state.clients.find(c => String(c.name).trim().toLowerCase() === ln) || null;
   return null;
 }
+// --- Conflito de horário (ciente da DURAÇÃO do serviço) → evita 2 clientes no mesmo horário ---
+function hhmmToMin(t) { const p = String(t || '').split(':'); return (+p[0] || 0) * 60 + (+p[1] || 0); }
+function apptDurMin(a) { const sv = state.services.find(s => s.id === a.serviceId); return (sv && +sv.dur) || 60; }
+function slotConflict(date, time, dur, exceptId) {
+  const s = hhmmToMin(time), e = s + (+dur || 60);
+  return state.appointments.find(a => {
+    if (a.status !== 'agendado' || a.date !== date || a.id === exceptId) return false;
+    const bs = hhmmToMin(a.time), be = bs + apptDurMin(a);
+    return s < be && bs < e;   // sobreposição de faixas de horário
+  }) || null;
+}
 function modalAgenda(pre) {
   const p = pre || {};
   const slot = { iso: p.iso, time: p.time };
@@ -1174,11 +1185,17 @@ function modalAgenda(pre) {
   $('#a_save').onclick = () => {
     const name = $('#a_cli').value.trim(); if (!name) return toast('Informe a cliente.', 'warn');
     const sv = state.services.find(s => s.id === $('#a_serv').value);
+    const date = $('#a_date').value, time = $('#a_time').value;
+    const conf = slotConflict(date, time, sv ? sv.dur : 60, null);
+    if (conf) {
+      const quem = (conf.clientName || 'outra cliente').split(' ')[0];
+      if (!confirm('⚠️ Esse horário bate com ' + quem + ' às ' + conf.time + ' (' + conf.serviceName + ').\n\nAgendar assim mesmo?')) return;
+    }
     let cli = findClientByContact(name, p.phone);
     let novo = false;
     if (!cli) { cli = { id: 'c_' + uid(), name, phone: p.phone || '', birthday: '', notes: '', createdAt: todayISO() }; state.clients.push(cli); novo = true; }
     else if (p.phone && !cli.phone) { cli.phone = p.phone; }   // completa o telefone da ficha existente
-    state.appointments.push({ id: uid(), date: $('#a_date').value, time: $('#a_time').value, serviceId: sv.id, serviceName: sv.name, clientId: cli.id, clientName: cli.name, price: sv.price, status: 'agendado' });
+    state.appointments.push({ id: uid(), date, time, serviceId: sv.id, serviceName: sv.name, clientId: cli.id, clientName: cli.name, price: sv.price, status: 'agendado' });
     save(); closeModal(); render();
     toast(novo ? 'Agendado 📅 — cliente nova cadastrada 💜' : 'Agendado 📅 — vinculado a ' + cli.name.split(' ')[0] + ' ✓', 'ok');
   };
