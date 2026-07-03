@@ -166,7 +166,7 @@ function seed() {
   const names = ['Ana Beatriz Lima', 'Camila Souza', 'Fernanda Rocha', 'Juliana Alves', 'Patrícia Gomes', 'Renata Dias', 'Tatiane Melo', 'Vanessa Cardoso', 'Bruna Castro', 'Larissa Pinto'];
   const clients = names.map((n, idx) => ({
     id: 'c_' + idx, name: n, phone: `(11) 9${(40000000 + idx * 137711).toString().slice(0, 4)}-${(1000 + idx * 311).toString().slice(0, 4)}`,
-    birthday: `${String(((idx * 3) % 12) + 1).padStart(2, '0')}-${String(((idx * 7) % 27) + 1).padStart(2, '0')}`, notes: '', createdAt: todayISO()
+    notes: '', createdAt: todayISO()
   }));
 
   const tx = [];
@@ -648,11 +648,10 @@ VIEWS.clientes = {
     <div class="card mt">
       <p class="muted" style="margin-bottom:14px">💡 Toda vez que você registra um atendimento com um nome novo, a cliente é <b>cadastrada automaticamente</b> aqui.</p>
       <div class="tbl-wrap"><table class="tbl">
-        <thead><tr><th>Cliente</th><th>Telefone</th><th>Aniversário</th><th class="num">Visitas</th><th class="num">Total gasto</th><th>Última visita</th><th></th></tr></thead>
+        <thead><tr><th>Cliente</th><th>Telefone</th><th class="num">Visitas</th><th class="num">Total gasto</th><th>Última visita</th><th></th></tr></thead>
         <tbody>${rows.map(({ c, s }) => `<tr>
           <td><div class="row" style="gap:10px"><span class="cli-av" style="background:${avColor(c.name)}">${initials(c.name)}</span><b>${esc(c.name)}</b>${s.visits >= 3 ? '<span class="badge b-violet">fiel</span>' : ''}</div></td>
           <td class="muted">${esc(c.phone || '—')}</td>
-          <td class="muted">${c.birthday ? c.birthday.split('-').reverse().join('/') : '—'}</td>
           <td class="num">${s.visits}</td><td class="num">${fmt(s.total)}</td>
           <td class="muted">${s.last ? fmtDateFull(s.last) : '—'}</td>
           <td class="num" style="white-space:nowrap"><button class="modal-x" data-act="edit-cliente" data-id="${c.id}" title="Editar cliente">✏️</button><button class="modal-x" data-act="del-cliente" data-id="${c.id}" title="Excluir">🗑️</button></td></tr>`).join('')}</tbody>
@@ -1186,9 +1185,6 @@ function buildNotifs() {
   lowStock().forEach(it => out.push({ key: 'low_' + it.id, grp: '📦 Materiais acabando', text: `<b>${esc(it.name)}</b> — restam ${it.qty} ${esc(it.unit)} (mínimo ${it.min})`, act: 'gerar-pedido', actLabel: '🛒 Ver lista de compras' }));
   (state.appointments || []).filter(a => a && a.pending && a.source === 'link' && a.status === 'agendado')
     .forEach(a => out.push({ key: 'hold_' + a.id, grp: '📅 Agenda', text: `⏳ <b>${esc(a.clientName)}</b> pediu <b>${esc(a.serviceName)}</b> pelo link — ${a.date.split('-').reverse().join('/')} às ${a.time}`, act: 'go-agenda', actLabel: 'Ver agenda' }));
-  const dm = todayISO().slice(8, 10) + '-' + todayISO().slice(5, 7);
-  (state.clients || []).filter(c => String(c.birthday || '').replace(/\//g, '-').trim() === dm)
-    .forEach(c => out.push({ key: 'bday_' + c.id + '_' + todayISO(), grp: '💜 Clientes', text: `🎂 Hoje é aniversário de <b>${esc(c.name)}</b> — que tal um parabéns no WhatsApp?`, act: 'go-clientes', actLabel: 'Ver clientes' }));
   const v = (typeof vencInfo === 'function' && !isAdmin()) ? vencInfo() : null;
   if (v && !v.recorrente && v.days >= 0 && v.days <= 10) out.push({ key: 'venc_' + v.end.toISOString().slice(0, 10), grp: '💳 Assinatura', text: `⏳ Seu acesso vence em <b>${v.days} dia(s)</b> (${v.end.toLocaleDateString('pt-BR')})`, act: 'assinar', actLabel: 'Renovar' });
   return out;
@@ -1281,7 +1277,7 @@ function modalAtendimento() {
     if (!servName) return toast('Informe o serviço.', 'warn');
     if (!name || !(val >= 0)) return toast('Preencha cliente e valor.', 'warn');
     let cli = findClientByContact(name, '');
-    if (!cli) { cli = { id: 'c_' + uid(), name, phone: '', birthday: '', notes: '', createdAt: todayISO() }; state.clients.push(cli); toast(`Cliente "${name}" cadastrada automaticamente 💖`, 'ok'); }
+    if (!cli) { cli = { id: 'c_' + uid(), name, phone: '', notes: '', createdAt: todayISO() }; state.clients.push(cli); toast(`Cliente "${name}" cadastrada automaticamente 💖`, 'ok'); }
     const service = findServ();
     state.transactions.push({ id: uid(), type: 'in', category: 'Atendimentos', amount: val, desc: servName + ' — ' + name.split(' ')[0], date: $('#f_date').value, clientId: cli.id });
     if (service && $('#f_baixa').checked) deduct(service);
@@ -1408,12 +1404,12 @@ function modalCliente(editId) {
   if (editId && !c) return;
   openModal(c ? '✏️ Editar cliente' : 'Novo cliente', `
     <div class="field"><label>Nome</label><input class="input" id="c_name" placeholder="Nome completo" value="${c ? esc(c.name) : ''}"/></div>
-    <div class="field-row"><div class="field"><label>Telefone</label><input class="input" id="c_phone" placeholder="(11) 9...." value="${c ? esc(c.phone || '') : ''}"/></div><div class="field"><label>Aniversário (dd-mm)</label><input class="input" id="c_bday" placeholder="15-08" value="${c ? esc(c.birthday || '') : ''}"/></div></div>
+    <div class="field"><label>Telefone</label><input class="input" id="c_phone" placeholder="(11) 9...." value="${c ? esc(c.phone || '') : ''}"/></div>
     <div class="field"><label>Observações</label><textarea id="c_notes" placeholder="Preferências, alergias, esmalte favorito...">${c ? esc(c.notes || '') : ''}</textarea></div>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="c_save">Salvar</button>`);
   $('#c_save').onclick = () => {
     const name = $('#c_name').value.trim(); if (!name) return toast('Informe o nome.', 'warn');
-    const data = { name, phone: $('#c_phone').value.trim(), birthday: $('#c_bday').value.trim(), notes: $('#c_notes').value.trim() };
+    const data = { name, phone: $('#c_phone').value.trim(), notes: $('#c_notes').value.trim() };
     if (c) Object.assign(c, data);
     else state.clients.push({ id: 'c_' + uid(), ...data, createdAt: todayISO() });
     save(); closeModal(); render(); toast(c ? 'Cliente atualizada ✨' : 'Cliente cadastrada 💖', 'ok');
@@ -1530,7 +1526,7 @@ function modalAgenda(pre) {
     }
     let cli = findClientByContact(name, p.phone);
     let novo = false;
-    if (!cli) { cli = { id: 'c_' + uid(), name, phone: p.phone || '', birthday: '', notes: '', createdAt: todayISO() }; state.clients.push(cli); novo = true; }
+    if (!cli) { cli = { id: 'c_' + uid(), name, phone: p.phone || '', notes: '', createdAt: todayISO() }; state.clients.push(cli); novo = true; }
     else if (p.phone && !cli.phone) { cli.phone = p.phone; }   // completa o telefone da ficha existente
     state.appointments.push({ id: uid(), date, time, serviceId: sv.id, serviceName: sv.name, clientId: cli.id, clientName: cli.name, price: sv.price, status: 'agendado' });
     save(); closeModal(); render();
@@ -1915,7 +1911,7 @@ const ACTIONS = {
     const a = state.appointments.find(x => x.id === id); if (!a) return;
     // vincula (ou cria) a ficha da cliente a partir do nome + telefone do pedido
     let cli = findClientByContact(a.clientName, a.phone);
-    if (!cli) { cli = { id: 'c_' + uid(), name: a.clientName, phone: a.phone || '', birthday: '', notes: '', createdAt: todayISO() }; state.clients.push(cli); }
+    if (!cli) { cli = { id: 'c_' + uid(), name: a.clientName, phone: a.phone || '', notes: '', createdAt: todayISO() }; state.clients.push(cli); }
     else if (a.phone && !cli.phone) { cli.phone = a.phone; }
     a.clientId = cli.id; a.clientName = cli.name; a.pending = false;
     save(); render(); toast('Pedido aceito ✅ — vinculado a ' + cli.name.split(' ')[0], 'ok');
