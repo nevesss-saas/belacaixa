@@ -746,14 +746,14 @@ VIEWS.estoque = {
       ${miniStat('📦', 'Itens', state.inventory.length)}
       ${miniStat('⚠️', 'Precisam repor', low.length)}
       ${miniStat('🛒', 'Promoções ativas', state.market.length)}
-    </div><div class="row"><button class="btn btn-outline" data-act="new-item">＋ Item</button><button class="btn btn-primary" data-act="gerar-pedido">🤖 Gerar pedido</button></div></div>
+    </div><div class="row"><button class="btn btn-outline" data-act="new-item">＋ Item</button><button class="btn btn-primary" data-act="gerar-pedido">🛒 Lista de compras</button></div></div>
 
     ${low.length ? `<div class="insight tone-amber mt" style="max-width:none"><div class="ins-ico" style="background:#fef3df">🛒</div>
       <div style="flex:1">
         <div class="row between" style="align-items:baseline"><h4>Repor ${low.length} item(ns)</h4><b style="font-family:var(--display);color:var(--violet)">${fmt(pedidoTotal())}</b></div>
-        <p>Estão no/abaixo do mínimo. Clique num item pra repor, ou monte a lista toda (já nos melhores preços).</p>
+        <p>Estão no/abaixo do mínimo e <b>já entraram sozinhos</b> na sua lista de compras. Clique num item pra repor, ou abra a lista.</p>
         <div class="repor-chips">${low.map(it => `<button class="repor-chip ${it.qty <= 0 ? 'is-zero' : ''}" data-act="repor-item" data-id="${it.id}" title="Repor ${esc(it.name)}">${it.qty <= 0 ? '🚨' : '📦'} ${esc(it.name)} · <b>${it.qty}</b>/${it.min} ${esc(it.unit)}</button>`).join('')}</div>
-        <button class="btn btn-primary btn-sm" style="margin-top:12px" data-act="gerar-pedido">🤖 Montar lista de compras (${fmt(pedidoTotal())}) →</button>
+        <button class="btn btn-primary btn-sm" style="margin-top:12px" data-act="gerar-pedido">🛒 Ver lista de compras (~${fmt(pedidoTotal())}) →</button>
       </div></div>` : ''}
 
     <div class="grid cols-2 mt">
@@ -1145,6 +1145,8 @@ function updatePrivacyEye() {
 }
 
 function render() {
+  const novos = syncShoppingList();   // itens que chegaram no mínimo entram sozinhos na lista de compras
+  if (novos.length) toast(novos.length === 1 ? novos[0] + ' entrou na lista de compras — está acabando' : novos.length + ' materiais entraram na lista de compras', 'warn');
   const v = VIEWS[currentView];
   $('#viewTitle').textContent = v.title;
   $('#viewSubtitle').textContent = v.subtitle;
@@ -1161,6 +1163,16 @@ function render() {
   $$('#navMenu .nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === currentView));
   $('#bizName').textContent = state.business.name;
   updateStockBadge();
+  updateStockAlert();
+}
+// alerta ⚠️ no TOPO da plataforma: nº de materiais acabando — clique abre a lista de compras
+function updateStockAlert() {
+  const btn = $('#stockAlert'); if (!btn) return;
+  const n = (state && Array.isArray(state.inventory)) ? lowStock().length : 0;
+  btn.hidden = n === 0;
+  const b = $('#stockAlertN'); if (b) b.textContent = n;
+  btn.title = n + ' material(is) acabando — ver lista de compras';
+  btn.onclick = modalListaCompras;
 }
 // selo vermelho no menu 📦 Estoque com o nº de itens a repor (sempre visível)
 function updateStockBadge() {
@@ -1227,7 +1239,7 @@ function deduct(service) {
   if (hitMin.length) {
     const parts = hitMin.map(it => it.qty <= 0 ? `${esc(it.name)} (zerou!)` : `${esc(it.name)} (${it.qty} ${esc(it.unit)}, mín ${it.min})`);
     const um = hitMin.length === 1 ? hitMin[0] : null;
-    const act = { label: um ? 'Repor' : 'Ver lista', onClick: () => um ? modalRepor(um.id) : modalPedido() };
+    const act = { label: um ? 'Repor' : 'Ver lista', onClick: () => um ? modalRepor(um.id) : modalListaCompras() };
     toast('Estoque no limite — hora de repor 📦: ' + parts.join(' · '), 'warn', 6500, act);
   }
 }
@@ -1559,21 +1571,57 @@ function modalRepor(id) {
     save(); closeModal(); render(); toast('Estoque reposto! +' + q + ' ' + it.unit + (d > 0 ? ' (−' + (+d.toFixed(2)) + '%)' : ''), 'ok');
   };
 }
-function modalPedido() {
-  const rows = pedidoItens();
-  if (!rows.length) { toast('Estoque saudável — nada para comprar agora ✅', 'ok'); return; }
-  const total = rows.reduce((s, r) => s + r.sub, 0);
-  openModal('🤖 Pedido de compra sugerido', `
-    <p class="muted" style="margin-bottom:14px">A IA montou este pedido com os itens abaixo do mínimo, já nos melhores preços encontrados:</p>
-    <table class="tbl"><thead><tr><th>Item</th><th>Fornecedor</th><th class="num">Qtd</th><th class="num">Subtotal</th></tr></thead>
-    <tbody>${rows.map(r => `<tr><td><b>${esc(r.it.name)}</b></td><td class="muted">${esc(r.off ? r.off.supplier : r.it.supplier)}${r.off ? ` <span class="badge b-red">${r.off.discount}%</span>` : ''}</td><td class="num">${r.qty} ${r.it.unit}</td><td class="num">${fmt(r.sub)}</td></tr>`).join('')}</tbody></table>
-    <div class="kv mt" style="font-size:16px"><span>Total do pedido</span><b style="color:var(--violet)">${fmt(total)}</b></div>
-  `, `<button class="btn btn-ghost" data-close>Fechar</button><button class="btn btn-primary" id="p_buy">Comprar tudo (${fmt(total)})</button>`);
-  $('#p_buy').onclick = () => {
-    rows.forEach(r => { r.it.qty = +(r.it.qty + r.qty).toFixed(2); r.it.cost = r.price; });
-    state.transactions.push({ id: uid(), type: 'out', category: 'Matéria-prima', amount: +total.toFixed(2), desc: 'Pedido de reposição (IA) — ' + rows.length + ' itens', date: todayISO() });
-    save(); closeModal(); render(); toast('Pedido realizado! Estoque reposto 📦', 'ok');
-  };
+/* ---------- LISTA DE COMPRAS (salva na conta; sem compra automática) ----------
+   O que chega no mínimo ENTRA SOZINHO na lista e sai quando é reposto.
+   Não existe mais "comprar tudo": a compra real continua item a item no
+   Repor (que atualiza estoque e lança a saída no caixa — regra de ouro). */
+function syncShoppingList() {
+  if (!state || !Array.isArray(state.inventory)) return [];
+  if (!Array.isArray(state.shoppingList)) state.shoppingList = [];
+  const lowIds = new Set(lowStock().map(i => i.id));
+  const before = state.shoppingList.length;
+  // sai da lista: item excluído do estoque ou já reposto (voltou acima do mínimo)
+  state.shoppingList = state.shoppingList.filter(e => lowIds.has(e.itemId));
+  // entra na lista: item que acabou de chegar no mínimo
+  const inList = new Set(state.shoppingList.map(e => e.itemId));
+  const added = [];
+  lowStock().forEach(it => {
+    if (inList.has(it.id)) return;
+    const qty = Math.max(it.min, Math.ceil(it.min * 2 - it.qty));
+    state.shoppingList.push({ id: 'sl_' + uid(), itemId: it.id, qty, done: false, addedAt: todayISO() });
+    added.push(it.name);
+  });
+  if (added.length || state.shoppingList.length !== before) save();
+  return added;
+}
+function modalListaCompras() {
+  syncShoppingList();
+  const rows = (state.shoppingList || []).map(e => {
+    const it = state.inventory.find(i => i.id === e.itemId); if (!it) return null;
+    const off = bestOffer(it.id); const price = off ? off.price : it.cost;
+    return { e, it, off, price, sub: +(e.qty * price).toFixed(2) };
+  }).filter(Boolean);
+  if (!rows.length) { toast('Estoque saudável — nada na lista de compras ✅', 'ok'); return; }
+  const falta = () => rows.filter(r => !r.e.done).reduce((s, r) => s + r.sub, 0);
+  openModal('🛒 Lista de compras', `
+    <p class="muted" style="margin-bottom:12px">Salva automaticamente na sua conta: o que chega no mínimo <b>entra sozinho</b> aqui e sai quando você repõe. Marque o que já comprou ✔️</p>
+    ${rows.map(r => `
+      <div class="shop-row ${r.e.done ? 'is-done' : ''}" id="row_${r.e.id}">
+        <label class="row" style="gap:10px;flex:1;cursor:pointer;align-items:flex-start">
+          <input type="checkbox" data-shop="${r.e.id}" ${r.e.done ? 'checked' : ''} style="width:auto;margin-top:3px"/>
+          <span><b class="shop-name">${esc(r.it.name)}</b> — comprar ${r.e.qty} ${esc(r.it.unit)}
+          <span class="muted" style="font-size:12.5px;display:block">tem ${r.it.qty}/${r.it.min} ${esc(r.it.unit)} · ${esc(r.off ? r.off.supplier : r.it.supplier)} ${fmt(r.price)}/${esc(r.it.unit)}${r.off ? ` <span class="badge b-red">${r.off.discount}% off</span>` : ''} · ~${fmt(r.sub)}</span></span>
+        </label>
+        <button class="btn btn-soft btn-sm" data-act="repor-item" data-id="${r.it.id}">Repor</button>
+      </div>`).join('')}
+    <div class="kv mt" style="font-size:16px"><span>Falta comprar</span><b id="shopTotal" style="color:var(--violet)">${fmt(falta())}</b></div>
+  `, `<button class="btn btn-ghost" data-close>Fechar</button>`);
+  document.querySelectorAll('[data-shop]').forEach(cb => cb.onchange = () => {
+    const e = state.shoppingList.find(x => x.id === cb.dataset.shop); if (!e) return;
+    e.done = cb.checked; save();
+    const rowEl = document.getElementById('row_' + e.id); if (rowEl) rowEl.classList.toggle('is-done', e.done);
+    const t = document.getElementById('shopTotal'); if (t) t.textContent = fmt(falta());
+  });
 }
 /* ---------- LINK PÚBLICO DE AGENDAMENTO (enxuto, sem Cloud API) ----------
    A cliente abre a página agendar.html, escolhe serviço/dia/horário e o pedido
@@ -1788,7 +1836,7 @@ const ACTIONS = {
   'del-servico': (id) => { if (confirm('Excluir este serviço?')) { state.services = state.services.filter(s => s.id !== id); save(); render(); toast('Serviço removido.', 'info'); } },
   'new-item': modalItem,
   'new-asset': modalAsset,
-  'gerar-pedido': modalPedido,
+  'gerar-pedido': modalListaCompras,
   'go-estoque': () => setView('estoque'),
   'go-patrimonio': () => setView('patrimonio'),
   'assinar': () => showSubGate(),

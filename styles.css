@@ -444,6 +444,14 @@ textarea{resize:vertical;min-height:70px}
 .ib-ghost:hover{background:#e6e2ee}
 .ib-sm{width:30px;height:30px;font-size:13px;border-radius:8px}
 
+/* ---- alerta de estoque no topo + lista de compras ---- */
+.stock-alert{position:relative;background:#fff7ed;border:1px solid #fde3bf;border-radius:12px;padding:7px 11px;font-size:16px;cursor:pointer;line-height:1;transition:.15s}
+.stock-alert:hover{transform:translateY(-1px);box-shadow:0 6px 14px -8px rgba(20,10,40,.35)}
+.sa-badge{position:absolute;top:-6px;right:-6px;background:#ef4444;color:#fff;font-size:10.5px;font-weight:800;border-radius:999px;min-width:17px;height:17px;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid #fff}
+.shop-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line)}
+.shop-row.is-done .shop-name{text-decoration:line-through;opacity:.55}
+.shop-row.is-done{opacity:.75}
+
 /* ---- serviços ---- */
 .svc-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:16px}
 .svc-card{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 4px 14px -11px rgba(20,10,40,.4);transition:.15s}
