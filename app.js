@@ -550,15 +550,38 @@ function stockRow(it) {
 }
 
 /* ---------- FINANCEIRO ---------- */
-let finFilter = { month: 'all', type: 'all' };
+let finFilter = { range: 'all', type: 'all' };
+// rótulo humano do período selecionado
+function finRangeLabel(r) {
+  const map = { all: 'Tudo', day: 'Hoje', week: 'Últimos 7 dias', fortnight: 'Últimos 15 dias', month: 'Este mês' };
+  if (map[r]) return map[r];
+  if (/^\d{4}-\d{2}$/.test(r)) return MONTHS[+r.slice(5) - 1] + '/' + r.slice(2, 4);
+  return 'Tudo';
+}
+// um lançamento (data ISO) cai no período do filtro?
+function finInRange(dateISO) {
+  const r = finFilter.range;
+  if (r === 'all') return true;
+  const hoje = todayISO();
+  if (r === 'day') return dateISO === hoje;
+  if (r === 'month') return monthKey(dateISO) === curMonthKey();
+  if (r === 'week' || r === 'fortnight') {
+    const n = r === 'week' ? 7 : 15;
+    const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - (n - 1));
+    const d = new Date(dateISO + 'T00:00:00');
+    return d >= start && d <= new Date(hoje + 'T23:59:59');   // últimos N dias, até hoje
+  }
+  if (/^\d{4}-\d{2}$/.test(r)) return monthKey(dateISO) === r;   // mês específico
+  return true;
+}
 VIEWS.financeiro = {
   title: 'Fluxo de caixa', subtitle: 'Entradas, saídas e lucro líquido',
   html() {
     const cur = monthStats(curMonthKey());
-    let list = [...state.transactions].sort((a, b) => b.date.localeCompare(a.date));
-    if (finFilter.month !== 'all') list = list.filter(t => monthKey(t.date) === finFilter.month);
+    let list = [...state.transactions].sort((a, b) => b.date.localeCompare(a.date)).filter(t => finInRange(t.date));
     if (finFilter.type !== 'all') list = list.filter(t => t.type === finFilter.type);
-    const monthsOpts = ['all', ...new Set(state.transactions.map(t => monthKey(t.date)))].sort().reverse();
+    const mesesEspecificos = [...new Set(state.transactions.map(t => monthKey(t.date)))].sort().reverse();
+    const rl = finRangeLabel(finFilter.range);
     const fIn = sumIn(list), fOut = sumOut(list);
     return `
     <div class="section-head">
@@ -568,15 +591,24 @@ VIEWS.financeiro = {
           <button data-type="in" class="${finFilter.type === 'in' ? 'on' : ''}">Entradas</button>
           <button data-type="out" class="${finFilter.type === 'out' ? 'on' : ''}">Saídas</button>
         </div>
-        <select id="monthSel" style="width:auto">${monthsOpts.map(m => `<option value="${m}" ${finFilter.month === m ? 'selected' : ''}>${m === 'all' ? 'Todos os meses' : MONTHS[+m.slice(5) - 1] + '/' + m.slice(2, 4)}</option>`).join('')}</select>
+        <select id="rangeSel" style="width:auto">
+          <optgroup label="Período">
+            <option value="all"${finFilter.range === 'all' ? ' selected' : ''}>Tudo</option>
+            <option value="day"${finFilter.range === 'day' ? ' selected' : ''}>Hoje (diário)</option>
+            <option value="week"${finFilter.range === 'week' ? ' selected' : ''}>Últimos 7 dias (semanal)</option>
+            <option value="fortnight"${finFilter.range === 'fortnight' ? ' selected' : ''}>Últimos 15 dias (quinzenal)</option>
+            <option value="month"${finFilter.range === 'month' ? ' selected' : ''}>Este mês (mensal)</option>
+          </optgroup>
+          ${mesesEspecificos.length ? `<optgroup label="Por mês">${mesesEspecificos.map(m => `<option value="${m}"${finFilter.range === m ? ' selected' : ''}>${MONTHS[+m.slice(5) - 1] + '/' + m.slice(2, 4)}</option>`).join('')}</optgroup>` : ''}
+        </select>
       </div>
       <div class="row"><button class="btn btn-outline" data-act="new-saida">－ Saída</button><button class="btn btn-primary" data-act="new-entrada">＋ Entrada</button></div>
     </div>
 
     <div class="grid cols-3">
-      ${kpi('⬆️', 'Entradas (filtro)', fmt(fIn), '', '#e2f8f1', '#00b389')}
-      ${kpi('⬇️', 'Saídas (filtro)', fmt(fOut), '', '#fde7ec', '#f0476a')}
-      ${kpi('💎', 'Resultado', fmt(fIn - fOut), `<span class="kpi-delta ${fIn - fOut >= 0 ? 'delta-up' : 'delta-down'}">margem ${fIn ? Math.round((fIn - fOut) / fIn * 100) : 0}%</span>`, '#f3e8ff', '#9b5de5')}
+      ${kpi('⬆️', 'Entradas · ' + rl, fmt(fIn), '', '#e2f8f1', '#00b389')}
+      ${kpi('⬇️', 'Saídas · ' + rl, fmt(fOut), '', '#fde7ec', '#f0476a')}
+      ${kpi('💎', 'Resultado · ' + rl, fmt(fIn - fOut), `<span class="kpi-delta ${fIn - fOut >= 0 ? 'delta-up' : 'delta-down'}">margem ${fIn ? Math.round((fIn - fOut) / fIn * 100) : 0}%</span>`, '#f3e8ff', '#9b5de5')}
     </div>
 
     <div class="card mt">
@@ -588,7 +620,7 @@ VIEWS.financeiro = {
   },
   init() {
     $$('#typeSeg button').forEach(b => b.onclick = () => { finFilter.type = b.dataset.type; render(); });
-    $('#monthSel').onchange = e => { finFilter.month = e.target.value; render(); };
+    $('#rangeSel').onchange = e => { finFilter.range = e.target.value; render(); };
   }
 };
 function txRow(t) {
