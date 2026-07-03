@@ -161,6 +161,7 @@ function seed() {
   return {
     v: 1,
     business: { name: 'Nails e Pedicure', reserveTarget: 5000, monthlyGoal: 8000, hours: { open: '09:00', close: '19:00', days: [1, 2, 3, 4, 5, 6], slot: 30 } },
+    security: { pinHash: '' },
     clients, services, inventory: inv, transactions: tx, appointments: appts, assets, market,
     patHist, chat: []
   };
@@ -1000,14 +1001,78 @@ function modalEditClient(uid, email, plan, nome, mode) {
 /* ============================================================
    RENDER / ROUTER
    ============================================================ */
+/* ============================================================
+   PRIVACIDADE — olho + PIN de 6 dígitos
+   Tranca só a INTERFACE das 3 telas de dinheiro (Painel, Fluxo de
+   caixa e Patrimônio). Não é criptografia dos dados — é pra esconder
+   os valores de quem usa o sistema junto (ex.: secretária).
+   O PIN é guardado com hash SHA-256 + sal; nunca em texto puro.
+   ============================================================ */
+const PROTECTED_VIEWS = ['dashboard', 'financeiro', 'patrimonio'];
+let privacyUnlocked = false;   // por sessão — recarregar/re-logar volta a trancar
+const pinIsSet = () => !!(state && state.security && state.security.pinHash);
+const viewIsLocked = (view) => pinIsSet() && PROTECTED_VIEWS.includes(view) && !privacyUnlocked;
+
+async function hashPin(pin) {
+  const data = new TextEncoder().encode('belacaixa::pin::v1|' + String(pin));
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function verifyPin(pin) {
+  if (!pinIsSet()) return false;
+  return (await hashPin(pin)) === state.security.pinHash;
+}
+const onlyPin = (el) => { if (el) el.addEventListener('input', () => { el.value = el.value.replace(/\D/g, '').slice(0, 6); }); };
+
+function lockScreenHTML(v) {
+  return `<div class="lock-screen">
+    <div class="lock-card">
+      <div class="lock-emoji">🔒</div>
+      <h2>${esc(v.title)} protegido</h2>
+      <p>Esta tela mostra informações de dinheiro. Digite o seu PIN de 6 dígitos para ver.</p>
+      <input class="input pin-input" id="lockPin" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off"/>
+      <div id="lockErr" class="pin-err"></div>
+      <button class="btn btn-primary" id="lockGo" style="width:100%">👁 Ver com PIN</button>
+      <button class="btn btn-ghost btn-sm" id="lockForgot" style="margin-top:8px">Esqueci meu PIN</button>
+    </div>
+  </div>`;
+}
+function bindLockScreen() {
+  const inp = $('#lockPin'), go = $('#lockGo'), err = $('#lockErr');
+  if (!inp) return;
+  setTimeout(() => inp.focus(), 50);
+  inp.addEventListener('input', () => { inp.value = inp.value.replace(/\D/g, '').slice(0, 6); if (err) err.textContent = ''; });
+  const tryUnlock = async () => {
+    const pin = inp.value.replace(/\D/g, '');
+    if (pin.length !== 6) { err.textContent = 'Digite os 6 dígitos do PIN.'; return; }
+    if (await verifyPin(pin)) { privacyUnlocked = true; render(); toast('Desbloqueado 👁', 'ok'); }
+    else { err.textContent = 'PIN incorreto. Tente de novo.'; inp.value = ''; inp.focus(); }
+  };
+  go.onclick = tryUnlock;
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
+  $('#lockForgot').onclick = modalPinForgot;
+}
+function updatePrivacyEye() {
+  const eye = $('#privacyEye'); if (!eye) return;
+  const showable = pinIsSet() && PROTECTED_VIEWS.includes(currentView) && privacyUnlocked;
+  eye.hidden = !showable;
+  eye.onclick = () => { privacyUnlocked = false; render(); toast('Valores ocultados 🔒', 'info'); };
+}
+
 function render() {
   const v = VIEWS[currentView];
   $('#viewTitle').textContent = v.title;
   $('#viewSubtitle').textContent = v.subtitle;
-  $('#viewRoot').innerHTML = v.html();
-  const _vb = (typeof vencBannerHTML === 'function') ? vencBannerHTML() : '';
-  if (_vb) $('#viewRoot').insertAdjacentHTML('afterbegin', _vb);
-  v.init && v.init();
+  if (viewIsLocked(currentView)) {
+    $('#viewRoot').innerHTML = lockScreenHTML(v);
+    bindLockScreen();
+  } else {
+    $('#viewRoot').innerHTML = v.html();
+    const _vb = (typeof vencBannerHTML === 'function') ? vencBannerHTML() : '';
+    if (_vb) $('#viewRoot').insertAdjacentHTML('afterbegin', _vb);
+    v.init && v.init();
+  }
+  updatePrivacyEye();
   $$('#navMenu .nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === currentView));
   $('#bizName').textContent = state.business.name;
   updateStockBadge();
@@ -1454,6 +1519,93 @@ function modalLinkAgendamento() {
     catch (e) { const i = $('#lk_url'); i.select(); try { document.execCommand('copy'); } catch (_) {} toast('Link copiado!', 'ok'); }
   };
 }
+/* ---- Privacidade / PIN: seção de configuração + modais ---- */
+function pinSectionHTML() {
+  const on = pinIsSet();
+  return `<hr style="border:none;border-top:1px solid var(--line);margin:8px 0 14px">
+    <div class="field">
+      <label>🔒 Privacidade — PIN das telas de dinheiro <span class="muted" style="font-weight:400">(Painel, Fluxo de caixa e Patrimônio)</span></label>
+      <p class="muted" style="font-size:12.5px;margin:2px 0 8px">${on
+        ? 'Proteção <b>ativada</b> ✅ — quem abrir essas 3 telas precisa do PIN de 6 dígitos.'
+        : 'Ative pra esconder os valores de quem usa o sistema com você (ex.: secretária). Vai pedir um PIN de 6 dígitos pra ver.'}</p>
+      ${on ? `
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn btn-outline btn-sm" id="pin_change">Trocar PIN</button>
+          <button type="button" class="btn btn-danger btn-sm" id="pin_remove">Desativar proteção</button>
+        </div>` : `
+        <div class="field-row">
+          <div class="field"><label class="muted" style="font-weight:500;font-size:13px">Novo PIN (6 dígitos)</label><input class="input" id="pin_new" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off"/></div>
+          <div class="field"><label class="muted" style="font-weight:500;font-size:13px">Repita o PIN</label><input class="input" id="pin_new2" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off"/></div>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" id="pin_set">Ativar proteção com PIN</button>`}
+      <div id="pin_msg" class="pin-err"></div>
+    </div>`;
+}
+function bindPinSection() {
+  const msg = () => $('#pin_msg');
+  onlyPin($('#pin_new')); onlyPin($('#pin_new2'));
+  if ($('#pin_set')) $('#pin_set').onclick = async () => {
+    const a = ($('#pin_new').value || '').replace(/\D/g, ''), b2 = ($('#pin_new2').value || '').replace(/\D/g, '');
+    if (a.length !== 6) return msg().textContent = 'O PIN precisa ter 6 dígitos.';
+    if (a !== b2) return msg().textContent = 'Os dois PINs não são iguais.';
+    state.security = { pinHash: await hashPin(a) }; privacyUnlocked = true; save();
+    closeModal(); render(); toast('Proteção com PIN ativada 🔒', 'ok');
+  };
+  if ($('#pin_change')) $('#pin_change').onclick = modalPinChange;
+  if ($('#pin_remove')) $('#pin_remove').onclick = modalPinRemove;
+}
+function modalPinChange() {
+  openModal('Trocar PIN', `
+    <div class="field"><label>PIN atual</label><input class="input" id="pc_old" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off"/></div>
+    <div class="field"><label>Novo PIN (6 dígitos)</label><input class="input" id="pc_new" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off"/></div>
+    <div class="field"><label>Repita o novo PIN</label><input class="input" id="pc_new2" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off"/></div>
+    <div id="pc_msg" class="pin-err"></div>
+  `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="pc_go">Salvar novo PIN</button>`);
+  onlyPin($('#pc_old')); onlyPin($('#pc_new')); onlyPin($('#pc_new2'));
+  $('#pc_go').onclick = async () => {
+    const msg = $('#pc_msg');
+    const old = $('#pc_old').value.replace(/\D/g, ''), a = $('#pc_new').value.replace(/\D/g, ''), b2 = $('#pc_new2').value.replace(/\D/g, '');
+    if (!await verifyPin(old)) return msg.textContent = 'PIN atual incorreto.';
+    if (a.length !== 6) return msg.textContent = 'O novo PIN precisa ter 6 dígitos.';
+    if (a !== b2) return msg.textContent = 'Os dois novos PINs não são iguais.';
+    state.security = { pinHash: await hashPin(a) }; privacyUnlocked = true; save();
+    closeModal(); toast('PIN atualizado 🔒', 'ok');
+  };
+}
+function modalPinRemove() {
+  openModal('Desativar proteção', `
+    <p class="muted" style="margin-top:0">Digite o PIN atual pra desativar. As telas de dinheiro voltam a ficar visíveis sem PIN.</p>
+    <div class="field"><label>PIN atual</label><input class="input" id="pr_old" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off"/></div>
+    <div id="pr_msg" class="pin-err"></div>
+  `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-danger" id="pr_go">Desativar</button>`);
+  onlyPin($('#pr_old'));
+  $('#pr_go').onclick = async () => {
+    const msg = $('#pr_msg');
+    if (!await verifyPin($('#pr_old').value.replace(/\D/g, ''))) return msg.textContent = 'PIN incorreto.';
+    state.security = { pinHash: '' }; privacyUnlocked = true; save();
+    closeModal(); render(); toast('Proteção desativada.', 'info');
+  };
+}
+// Esqueci o PIN: pra remover, confirma a SENHA DA CONTA (re-autentica no Supabase)
+function modalPinForgot() {
+  const email = (currentUser && currentUser.email) || '';
+  openModal('Esqueci meu PIN', `
+    <p class="muted" style="margin-top:0">Por segurança, pra remover o PIN confirme a senha da sua conta${email ? ' <b>' + esc(email) + '</b>' : ''}. Depois você cria um novo em Configurações do negócio.</p>
+    <div class="field"><label>Senha da conta</label><input class="input" id="fpw" type="password" autocomplete="current-password" placeholder="Sua senha de login"/></div>
+    <div id="fpwErr" class="pin-err"></div>
+  `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-danger" id="fpwGo">Remover PIN</button>`);
+  $('#fpwGo').onclick = async () => {
+    const pw = $('#fpw').value, err = $('#fpwErr'), btn = $('#fpwGo');
+    if (!pw) return err.textContent = 'Digite sua senha.';
+    if (!sb || !email) return err.textContent = 'Sem conexão pra validar agora. Tente mais tarde.';
+    btn.disabled = true; btn.textContent = 'Validando…';
+    const { error } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (error) { err.textContent = 'Senha incorreta.'; btn.disabled = false; btn.textContent = 'Remover PIN'; return; }
+    state.security = { pinHash: '' }; privacyUnlocked = true; save();
+    closeModal(); render(); toast('PIN removido. Crie um novo em Configurações se quiser.', 'ok');
+  };
+}
+
 function modalBiz() {
   const b = state.business;
   const h = bizHours();
@@ -1472,9 +1624,11 @@ function modalBiz() {
       </div>
     </div>
     <div class="field-row"><div class="field"><label>Reserva de emergência alvo (R$)</label><input class="input" id="g_res" type="number" value="${b.reserveTarget}"/></div><div class="field"><label>Meta de faturamento mensal (R$)</label><input class="input" id="g_goal" type="number" value="${b.monthlyGoal}"/></div></div>
+    ${pinSectionHTML()}
     <hr style="border:none;border-top:1px solid var(--line);margin:8px 0 14px">
     <button class="btn btn-danger btn-sm" id="g_reset">↺ Restaurar dados de demonstração</button>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="g_save">Salvar</button>`);
+  bindPinSection();
   $('#g_days').querySelectorAll('button[data-d]').forEach(btn => btn.onclick = () => { btn.classList.toggle('btn-primary'); btn.classList.toggle('btn-ghost'); });
   $('#g_save').onclick = () => {
     b.name = $('#g_name').value.trim() || b.name; b.reserveTarget = +$('#g_res').value || b.reserveTarget; b.monthlyGoal = +$('#g_goal').value || b.monthlyGoal;

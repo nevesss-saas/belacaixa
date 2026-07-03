@@ -501,3 +501,14 @@ textarea{resize:vertical;min-height:70px}
   .biz-pill span{display:none}
   #demoBar{left:12px;right:12px;bottom:12px;transform:none;max-width:none;flex-wrap:wrap;justify-content:center;text-align:center}
 }
+
+/* ===== Privacidade — olho + PIN ===== */
+.eye-toggle{background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;color:var(--ink);white-space:nowrap;transition:.15s}
+.eye-toggle:hover{background:var(--bg);border-color:var(--violet);color:var(--violet)}
+.lock-screen{display:flex;justify-content:center;align-items:flex-start;padding:34px 16px}
+.lock-card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:36px 28px;max-width:380px;width:100%;text-align:center;box-shadow:0 14px 44px rgba(155,93,229,.12)}
+.lock-emoji{font-size:46px;line-height:1;margin-bottom:6px}
+.lock-card h2{margin:6px 0 4px}
+.lock-card p{color:var(--ink-3);font-size:14px;margin:0 0 16px}
+.pin-input{text-align:center;letter-spacing:.45em;font-size:22px;font-family:var(--display);margin-bottom:6px}
+.pin-err{color:#f0476a;font-size:13px;min-height:18px;margin:6px 0 2px}
