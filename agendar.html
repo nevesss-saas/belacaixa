@@ -114,7 +114,7 @@
 
           <button class="go" id="goBtn">✅ Reservar meu horário</button>
           <p class="fallback" id="fallback">Não abriu o WhatsApp? <a id="fallbackLink" href="#" target="_blank" rel="noopener">Toque aqui pra avisar o salão</a></p>
-          <p class="note">Seu horário fica <b>reservado na hora</b> 🔒 — o salão confirma com você pelo WhatsApp. 😊</p>
+          <p class="note" id="bookNote">Seu horário fica <b>reservado na hora</b> 🔒 — o salão confirma com você pelo WhatsApp. 😊</p>
         </div>
       </div>
     </div>
@@ -183,6 +183,15 @@
       // expediente do salão (com padrões) — só oferecemos horários dentro dele
       var oh = data.oh || { open:'09:00', close:'19:00', days:[1,2,3,4,5,6], slot:30 };
       if(!Array.isArray(oh.days) || !oh.days.length) oh.days = [1,2,3,4,5,6];
+
+      // reserva automática ligada? (recurso do plano do salão) — sem ela, o pedido vai direto pro WhatsApp
+      var AUTO = !data || data.auto !== 0;
+      if(!AUTO){
+        var bn = document.getElementById('bookNote');
+        if(bn) bn.innerHTML = 'Seu pedido vai direto pro <b>WhatsApp do salão</b> 💬 — ele confirma o horário com você. 😊';
+        var gb = document.getElementById('goBtn');
+        if(gb) gb.textContent = '💬 Pedir horário no WhatsApp';
+      }
       function isOpenDay(dstr){ var q = String(dstr||'').split('-'); if(q.length!==3) return true; var dd = new Date(+q[0], +q[1]-1, +q[2]); return oh.days.indexOf(dd.getDay()) >= 0; }
 
       // data mínima = hoje; valor inicial = primeiro dia de atendimento a partir de hoje
@@ -303,8 +312,8 @@
           }
         }
 
-        // sem id do salão (link antigo por #token) → não dá pra reservar no servidor; cai no fluxo de aviso
-        if(!sid){ openWa(svc, date, time, name, phone, note); return; }
+        // sem id do salão (link antigo) ou sem reserva automática no plano → pedido vai pelo WhatsApp
+        if(!sid || !AUTO){ openWa(svc, date, time, name, phone, note); return; }
 
         goBtn.disabled = true; goBtn.textContent = 'Reservando…';
         fetch(SB_URL + '/functions/v1/book-hold', {

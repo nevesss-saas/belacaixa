@@ -659,7 +659,7 @@ VIEWS.agenda = {
         ${miniStat('⏰', 'Próximo horário livre', nextSlot.label)}
       </div>
       <div class="row" style="gap:8px">
-        <button class="btn btn-outline" data-act="link-agenda">🔗 Link de agendamento</button>
+        <button class="btn btn-outline" data-act="link-agenda">${autoAgendaOk() ? '🔗' : '🔒'} Link de agendamento</button>
         <button class="btn btn-primary" data-act="new-agenda">＋ Agendar</button>
       </div>
     </div>
@@ -673,6 +673,10 @@ VIEWS.agenda = {
         <div class="section-head"><h2>${date === todayISO() ? '🔆 Hoje' : dayName(date) + ', ' + fmtDateFull(date)}</h2><span class="muted">${list.length} atend.</span></div>
         ${list.sort((a, b) => a.time.localeCompare(b.time)).map(apptRow).join('')}
       </div>`).join('') : `<div class="card mt"><div class="empty"><span class="e-ico">📭</span>Nenhum atendimento agendado. Que tal divulgar seus horários?</div></div>`}`;
+  },
+  init() {
+    // agendamento automático é do GOLD: sem ele, o convite aparece toda vez que a agenda abre
+    if (!autoAgendaOk()) modalGoldAgenda();
   }
 };
 function waPhone(raw) {
@@ -1773,7 +1777,7 @@ const ACTIONS = {
   'new-saida': () => modalTx('out'),
   'new-cliente': modalCliente,
   'new-agenda': () => modalAgenda(),
-  'link-agenda': modalLinkAgendamento,
+  'link-agenda': () => { if (!autoAgendaOk()) { modalGoldAgenda(); return; } modalLinkAgendamento(); },
   'new-servico': () => modalServico(),
   'edit-servico': (id) => modalServico(id),
   'del-servico': (id) => { if (confirm('Excluir este serviço?')) { state.services = state.services.filter(s => s.id !== id); save(); render(); toast('Serviço removido.', 'info'); } },
@@ -1910,6 +1914,47 @@ function trialInfo() {
 }
 function trialActive() { const t = trialInfo(); return !!(t && t.active); }
 function hasAccess() { return subActive() || trialActive(); }
+/* --- Agendamento automático (link + reserva na hora) é exclusivo do GOLD.
+   Cortesia de lançamento para as primeiras contas até 03/08/2026 (interna, sem anúncio na UI). --- */
+const AUTO_AGENDA_EARLY = ['c81920e0-9b26-438e-9cc6-f33e123b8094', '3a3adca8-c0fa-4b00-bf70-c38c497d8d3d', 'd737472f-8dff-4751-9945-ad724c1ba401'];
+const AUTO_AGENDA_EARLY_UNTIL = '2026-08-03';
+function goldActive() { return subActive() && /^gold/.test(String((subInfo && subInfo.plan) || '')); }
+function autoAgendaOk() {
+  if (demoMode || isAdmin() || goldActive()) return true;
+  return !!(currentUser && AUTO_AGENDA_EARLY.includes(currentUser.id) && todayISO() < AUTO_AGENDA_EARLY_UNTIL);
+}
+/* Upsell do GOLD — aparece sempre que alguém sem o plano tenta usar a agenda automática */
+function modalGoldAgenda() {
+  let bill = 'mes';
+  const silver = subActive() && /^silver/.test(String((subInfo && subInfo.plan) || ''));
+  const priceHTML = (b) => b === 'ano'
+    ? 'R$ 949,00 <small style="font-size:14px;color:var(--ink-3);font-weight:600">/ano — plano GOLD</small>'
+    : 'R$ 99,90 <small style="font-size:14px;color:var(--ink-3);font-weight:600">/mês — plano GOLD</small>';
+  openModal('🔒 Agendamento automático das clientes no WhatsApp', `
+    <div style="font-size:11px;font-weight:800;letter-spacing:.06em;color:#d6336c;text-transform:uppercase;margin-bottom:8px">✨ Recurso exclusivo do plano GOLD</div>
+    <h3 style="font-family:var(--display);font-size:23px;line-height:1.18;margin:0 0 10px">Sua cliente agenda sozinha, direto pelo WhatsApp.</h3>
+    <p class="muted" style="margin:0 0 12px">Ative o link de agendamento: ele mostra seus serviços, consulta sua agenda em tempo real e reserva o horário na hora — sem você precisar responder. E o melhor: assim que o atendimento acontece, a receita já entra no seu fluxo de caixa, como sempre.</p>
+    <ul style="list-style:none;padding:0;margin:0 0 14px;font-size:13.5px;display:flex;flex-direction:column;gap:6px">
+      <li>✔️ Fluxo de caixa, clientes, agenda e estoque</li>
+      <li>✔️ IA de compras e promoções</li>
+      <li>✔️ Assistente inteligente (respostas sobre seus números)</li>
+      <li>✨ <b>Agendamento automático das clientes</b></li>
+    </ul>
+    <div class="bill-toggle" id="gg_bill" style="margin:0 0 10px">
+      <button type="button" class="bt on" data-bill="mes">Mensal</button>
+      <button type="button" class="bt" data-bill="ano">Anual <span class="save-pill">2 meses grátis</span></button>
+    </div>
+    <div style="font-family:var(--display);font-weight:800;font-size:28px" id="gg_price">${priceHTML('mes')}</div>
+    ${silver ? '<p class="muted" style="margin:8px 0 0">Você já está no SILVER — o upgrade mantém tudo que você já usa e libera o resto.</p>' : ''}
+    <p class="muted" style="margin:10px 0 0;font-size:12px">🔒 Cartão (Stripe) ou Pix · cancele quando quiser</p>
+  `, `<button class="btn btn-ghost" data-close>Agora não</button><button class="btn btn-primary" id="gg_go">Assinar GOLD e ativar →</button>`);
+  $('#gg_bill').querySelectorAll('button[data-bill]').forEach(b => b.onclick = () => {
+    bill = b.dataset.bill;
+    $('#gg_bill').querySelectorAll('.bt').forEach(x => x.classList.toggle('on', x === b));
+    $('#gg_price').innerHTML = priceHTML(bill);
+  });
+  $('#gg_go').onclick = () => startCheckout(bill === 'ano' ? 'gold_anual' : 'gold_mensal', $('#gg_go'));
+}
 function vencInfo() {
   if (!subInfo || !subInfo.current_period_end) return null;
   const end = new Date(subInfo.current_period_end);
