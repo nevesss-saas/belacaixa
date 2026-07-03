@@ -1164,22 +1164,78 @@ function render() {
     $('#viewRoot').innerHTML = v.html();
     const _vb = (typeof vencBannerHTML === 'function') ? vencBannerHTML() : '';
     if (_vb) $('#viewRoot').insertAdjacentHTML('afterbegin', _vb);
+    const _nb = notifBarHTML();   // banner grande: só enquanto houver aviso NÃO lido
+    if (_nb) $('#viewRoot').insertAdjacentHTML('afterbegin', _nb);
     v.init && v.init();
   }
   updatePrivacyEye();
   $$('#navMenu .nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === currentView));
   $('#bizName').textContent = state.business.name;
   updateStockBadge();
-  updateStockAlert();
+  updateNotifBell();
 }
-// alerta ⚠️ no TOPO da plataforma: nº de materiais acabando — clique abre a lista de compras
-function updateStockAlert() {
-  const btn = $('#stockAlert'); if (!btn) return;
-  const n = (state && Array.isArray(state.inventory)) ? lowStock().length : 0;
-  btn.hidden = n === 0;
-  const b = $('#stockAlertN'); if (b) b.textContent = n;
-  btn.title = n + ' material(is) acabando — ver lista de compras';
-  btn.onclick = modalListaCompras;
+/* ---------- CENTRAL DE AVISOS ----------
+   Junta num lugar só tudo que pede atenção: materiais acabando (principal),
+   pedidos do link aguardando, aniversariantes do dia e vencimento do plano.
+   Aviso NÃO LIDO = banner grande no topo; leu tudo → banner some e fica só
+   o sininho 🔔 minimizado. Aviso novo faz o banner voltar sozinho.
+   O "lido" fica salvo por aviso na conta (state.notifRead = [keys]). */
+function buildNotifs() {
+  const out = [];
+  if (!state) return out;
+  lowStock().forEach(it => out.push({ key: 'low_' + it.id, grp: '📦 Materiais acabando', text: `<b>${esc(it.name)}</b> — restam ${it.qty} ${esc(it.unit)} (mínimo ${it.min})`, act: 'gerar-pedido', actLabel: '🛒 Ver lista de compras' }));
+  (state.appointments || []).filter(a => a && a.pending && a.source === 'link' && a.status === 'agendado')
+    .forEach(a => out.push({ key: 'hold_' + a.id, grp: '📅 Agenda', text: `⏳ <b>${esc(a.clientName)}</b> pediu <b>${esc(a.serviceName)}</b> pelo link — ${a.date.split('-').reverse().join('/')} às ${a.time}`, act: 'go-agenda', actLabel: 'Ver agenda' }));
+  const dm = todayISO().slice(8, 10) + '-' + todayISO().slice(5, 7);
+  (state.clients || []).filter(c => String(c.birthday || '').replace(/\//g, '-').trim() === dm)
+    .forEach(c => out.push({ key: 'bday_' + c.id + '_' + todayISO(), grp: '💜 Clientes', text: `🎂 Hoje é aniversário de <b>${esc(c.name)}</b> — que tal um parabéns no WhatsApp?`, act: 'go-clientes', actLabel: 'Ver clientes' }));
+  const v = (typeof vencInfo === 'function' && !isAdmin()) ? vencInfo() : null;
+  if (v && !v.recorrente && v.days >= 0 && v.days <= 10) out.push({ key: 'venc_' + v.end.toISOString().slice(0, 10), grp: '💳 Assinatura', text: `⏳ Seu acesso vence em <b>${v.days} dia(s)</b> (${v.end.toLocaleDateString('pt-BR')})`, act: 'assinar', actLabel: 'Renovar' });
+  return out;
+}
+function unreadNotifs() {
+  const read = (state && Array.isArray(state.notifRead)) ? state.notifRead : [];
+  return buildNotifs().filter(n => !read.includes(n.key));
+}
+function notifBarHTML() {
+  const un = unreadNotifs(); if (!un.length) return '';
+  const porGrupo = {};
+  un.forEach(n => porGrupo[n.grp] = (porGrupo[n.grp] || 0) + 1);
+  const resumo = Object.entries(porGrupo).map(([g, n]) => `${g}: <b>${n}</b>`).join(' · ');
+  return `<div class="notif-bar" id="notifBar">
+    <span style="font-size:24px">🔔</span>
+    <div style="flex:1;min-width:0"><b>${un.length} aviso(s) novo(s) no seu salão</b>
+      <div class="muted" style="font-size:13px;margin-top:2px">${resumo}</div></div>
+    <button class="btn btn-primary btn-sm" data-act="central-avisos">Ver avisos →</button>
+  </div>`;
+}
+function modalCentralAvisos() {
+  const list = buildNotifs();
+  if (!list.length) { toast('Nenhum aviso por aqui — tudo em dia ✅', 'ok'); return; }
+  const grupos = {};
+  list.forEach(n => (grupos[n.grp] = grupos[n.grp] || []).push(n));
+  openModal('🔔 Central de avisos', `
+    <p class="muted" style="margin-bottom:12px">Tudo que precisa da sua atenção, num lugar só. Ao abrir aqui, os avisos ficam <b>lidos</b> e o banner do topo some — aviso novo faz ele voltar.</p>
+    ${Object.entries(grupos).map(([g, ns]) => `
+      <div class="notif-grp">
+        <div class="notif-grp-head">${g} · ${ns.length}</div>
+        ${ns.map(n => `<div class="notif-item">${n.text}</div>`).join('')}
+        <button class="btn btn-soft btn-sm" data-act="${ns[0].act}" style="margin-top:6px">${ns[0].actLabel} →</button>
+      </div>`).join('')}
+  `, `<button class="btn btn-primary" data-close>Entendi ✔</button>`);
+  // abrir a central = ler tudo: banner some, sininho continua no lugar
+  state.notifRead = list.map(n => n.key); save();
+  const bar = document.getElementById('notifBar'); if (bar) bar.remove();
+  updateNotifBell();
+}
+// sininho 🔔 no TOPO (minimizado): mostra o total de avisos; vermelho = tem não lido
+function updateNotifBell() {
+  const btn = $('#notifBell'); if (!btn) return;
+  const all = buildNotifs(), un = unreadNotifs();
+  btn.hidden = all.length === 0;
+  const b = $('#notifBellN'); if (b) { b.textContent = all.length; b.classList.toggle('is-read', un.length === 0); }
+  btn.title = un.length ? un.length + ' aviso(s) novo(s) — abrir central de avisos' : all.length + ' aviso(s), tudo lido — abrir central';
+  btn.onclick = modalCentralAvisos;
 }
 // selo vermelho no menu 📦 Estoque com o nº de itens a repor (sempre visível)
 function updateStockBadge() {
@@ -1846,6 +1902,9 @@ const ACTIONS = {
   'gerar-pedido': modalListaCompras,
   'go-estoque': () => setView('estoque'),
   'go-patrimonio': () => setView('patrimonio'),
+  'go-agenda': () => { closeModal(); setView('agenda'); },
+  'go-clientes': () => { closeModal(); setView('clientes'); },
+  'central-avisos': () => modalCentralAvisos(),
   'assinar': () => showSubGate(),
   'repor-item': (id) => modalRepor(id),
   'edit-item': (id) => modalItem(id),

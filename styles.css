@@ -451,6 +451,14 @@ textarea{resize:vertical;min-height:70px}
 .shop-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line)}
 .shop-row.is-done .shop-name{text-decoration:line-through;opacity:.55}
 .shop-row.is-done{opacity:.75}
+.sa-badge.is-read{background:#a78bda}
+/* banner grande da central de avisos (some quando tudo está lido) */
+.notif-bar{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#fff7ed,#fdf2f8);border:1.5px solid #f6c98f;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 10px 24px -16px rgba(240,110,40,.5)}
+.notif-bar b{font-size:15px}
+/* central de avisos (modal) */
+.notif-grp{margin-bottom:16px}
+.notif-grp-head{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+.notif-item{padding:8px 11px;background:#faf6ff;border:1px solid #efe4fb;border-radius:8px;margin-bottom:5px;font-size:13.5px;line-height:1.4}
 
 /* ---- serviços ---- */
 .svc-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:16px}
