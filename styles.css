@@ -446,21 +446,21 @@ textarea{resize:vertical;min-height:70px}
 
 /* ---- serviços ---- */
 .svc-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:16px}
-.svc-card{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 4px 14px -11px rgba(20,10,40,.4);transition:.15s}
+.svc-card{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 4px 14px -11px rgba(20,10,40,.4);transition:.15s}
+.svc-top{display:flex;align-items:flex-start;gap:12px}
 .svc-card:hover{box-shadow:0 9px 22px -12px rgba(20,10,40,.45);transform:translateY(-1px)}
 .svc-info{flex:1;min-width:0}
 .svc-name{font-weight:700;font-size:15px;word-break:break-word}
 .svc-meta{font-size:12px;color:var(--ink-3);margin-top:2px}
 .svc-price{font-family:var(--display);font-weight:800;font-size:18px;color:var(--violet);white-space:nowrap}
 .svc-actions{display:flex;gap:6px;flex:0 0 auto;align-self:flex-start}
-/* receita de materiais do serviço */
-.svc-card{align-items:flex-start}
+/* receita de materiais do serviço — lista de largura total abaixo do topo do card */
 .svc-recipe{display:flex;flex-direction:column;gap:4px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
 .svc-recipe-head{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);margin-bottom:1px}
-.svc-mat{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12px;background:#faf6ff;border:1px solid #efe4fb;border-radius:8px;padding:5px 9px}
-.svc-mat-name{color:var(--ink);font-weight:600;line-height:1.25;word-break:break-word}
-.svc-mat-qty{color:var(--violet);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
-.svc-mat-none{color:var(--ink-3);background:#f6f3f8;border-color:var(--line);font-weight:500;justify-content:flex-start}
+.svc-mat{display:flex;align-items:baseline;gap:8px;font-size:12px;background:#faf6ff;border:1px solid #efe4fb;border-radius:8px;padding:5px 10px}
+.svc-mat-name{flex:1 1 auto;color:var(--ink);font-weight:600;line-height:1.3;overflow-wrap:break-word;hyphens:none}
+.svc-mat-qty{flex:0 0 auto;color:var(--violet);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.svc-mat-none{color:var(--ink-3);background:#f6f3f8;border-color:var(--line);font-weight:500}
 /* editor de materiais no modal de serviço */
 .sv-mats{display:flex;flex-direction:column;gap:8px}
 .sv-mat-row{display:flex;align-items:center;gap:8px}

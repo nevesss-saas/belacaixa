@@ -860,16 +860,18 @@ VIEWS.servicos = {
     const list = state.services || [];
     const cards = list.map(s => `
       <div class="svc-card">
-        <div class="svc-info">
-          <div class="svc-name">${esc(s.name)}</div>
-          <div class="svc-meta">${s.dur ? `⏱️ ${s.dur} min` : 'Sem duração definida'}</div>
-          ${svcMatsHTML(s)}
+        <div class="svc-top">
+          <div class="svc-info">
+            <div class="svc-name">${esc(s.name)}</div>
+            <div class="svc-meta">${s.dur ? `⏱️ ${s.dur} min` : 'Sem duração definida'}</div>
+          </div>
+          <div class="svc-price">${fmt(s.price)}</div>
+          <div class="svc-actions">
+            <button class="ib ib-edit" data-act="edit-servico" data-id="${s.id}" title="Editar serviço">✏️</button>
+            <button class="ib ib-ghost" data-act="del-servico" data-id="${s.id}" title="Excluir serviço">🗑️</button>
+          </div>
         </div>
-        <div class="svc-price">${fmt(s.price)}</div>
-        <div class="svc-actions">
-          <button class="ib ib-edit" data-act="edit-servico" data-id="${s.id}" title="Editar serviço">✏️</button>
-          <button class="ib ib-ghost" data-act="del-servico" data-id="${s.id}" title="Excluir serviço">🗑️</button>
-        </div>
+        ${svcMatsHTML(s)}
       </div>`).join('');
     return `
       <div class="section-head">
