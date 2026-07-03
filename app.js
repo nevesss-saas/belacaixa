@@ -607,7 +607,7 @@ function txRow(t) {
   const cli = t.clientId ? state.clients.find(c => c.id === t.clientId) : null;
   return `<tr><td class="muted">${fmtDateFull(t.date)}</td><td>${esc(t.desc)}</td><td><span class="tag-cat">${esc(t.category)}</span></td><td>${cli ? esc(cli.name.split(' ')[0]) : '—'}</td>
     <td class="num ${t.type === 'in' ? 't-in' : 't-out'}">${t.type === 'in' ? '+' : '−'} ${fmt(t.amount)}</td>
-    <td class="num"><button class="modal-x" data-act="del-tx" data-id="${t.id}" title="Excluir">🗑️</button></td></tr>`;
+    <td class="num" style="white-space:nowrap"><button class="modal-x" data-act="edit-tx" data-id="${t.id}" title="Editar lançamento">✏️</button><button class="modal-x" data-act="del-tx" data-id="${t.id}" title="Excluir">🗑️</button></td></tr>`;
 }
 
 /* ---------- CLIENTES ---------- */
@@ -1278,18 +1278,49 @@ function modalServico(id) {
     save(); closeModal(); render(); toast(s ? 'Serviço atualizado ✨' : 'Serviço adicionado 💅', 'ok');
   };
 }
-function modalTx(type) {
+function modalTx(type, editId) {
+  // com editId, edita o lançamento existente (ex.: corrigir valor quando deu desconto)
+  const tx = editId ? state.transactions.find(t => t.id === editId) : null;
+  if (editId && !tx) return;
+  if (tx) type = tx.type;
   const cats = type === 'in' ? ['Atendimentos', 'Venda de produtos', 'Outros'] : ['Matéria-prima', 'Aluguel', 'Energia / Água', 'Marketing', 'Salários / Comissão', 'Manutenção', 'Outros'];
-  openModal(type === 'in' ? 'Nova entrada' : 'Nova saída', `
-    <div class="field"><label>Descrição</label><input class="input" id="t_desc" placeholder="${type === 'in' ? 'Ex.: Venda de kit de esmaltes' : 'Ex.: Conta de luz'}"/></div>
-    <div class="field-row"><div class="field"><label>Valor (R$)</label><input class="input" id="t_val" type="number" step="0.01"/></div><div class="field"><label>Categoria</label><select id="t_cat">${cats.map(c => `<option>${c}</option>`).join('')}</select></div></div>
-    <div class="field"><label>Data</label><input class="input" id="t_date" type="date" value="${todayISO()}"/></div>
+  if (tx && tx.category && !cats.includes(tx.category)) cats.push(tx.category);   // não perde categoria antiga
+  openModal(tx ? (type === 'in' ? '✏️ Editar entrada' : '✏️ Editar saída') : (type === 'in' ? 'Nova entrada' : 'Nova saída'), `
+    <div class="field"><label>Descrição</label><input class="input" id="t_desc" placeholder="${type === 'in' ? 'Ex.: Venda de kit de esmaltes' : 'Ex.: Conta de luz'}" value="${tx ? esc(tx.desc) : ''}"/></div>
+    <div class="field-row"><div class="field"><label>Valor (R$)</label><input class="input" id="t_val" type="number" step="0.01" value="${tx ? tx.amount : ''}"/></div><div class="field"><label>Categoria</label><select id="t_cat">${cats.map(c => `<option${tx && tx.category === c ? ' selected' : ''}>${c}</option>`).join('')}</select></div></div>
+    <div class="field"><label>Data</label><input class="input" id="t_date" type="date" value="${tx ? tx.date : todayISO()}"/></div>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="t_save">Salvar</button>`);
   $('#t_save').onclick = () => {
     const val = parseFloat($('#t_val').value), desc = $('#t_desc').value.trim() || $('#t_cat').value;
     if (!(val > 0)) return toast('Informe um valor válido.', 'warn');
-    state.transactions.push({ id: uid(), type, category: $('#t_cat').value, amount: val, desc, date: $('#t_date').value });
-    save(); closeModal(); render(); toast((type === 'in' ? 'Entrada' : 'Saída') + ' registrada.', 'ok');
+    if (tx) { tx.amount = val; tx.desc = desc; tx.category = $('#t_cat').value; tx.date = $('#t_date').value; }   // mantém id, type e clientId
+    else state.transactions.push({ id: uid(), type, category: $('#t_cat').value, amount: val, desc, date: $('#t_date').value });
+    save(); closeModal(); render(); toast(tx ? 'Lançamento atualizado ✏️' : (type === 'in' ? 'Entrada' : 'Saída') + ' registrada.', 'ok');
+  };
+}
+// Conclusão com VALOR AJUSTÁVEL: o caixa recebe o que foi cobrado de verdade
+// (ex.: desconto pra cliente) — sem precisar corrigir o lançamento depois.
+function modalDoneAppt(id) {
+  const a = state.appointments.find(x => x.id === id); if (!a) return;
+  const cheio = +a.price || 0;
+  openModal('✓ Concluir atendimento', `
+    <p class="muted" style="margin-bottom:12px"><b>${esc(a.serviceName)}</b> — ${esc(a.clientName)}<br>Preço do catálogo: <b>${fmt(cheio)}</b></p>
+    <div class="field"><label>Valor cobrado (R$) <span class="muted" style="font-weight:400">— mude se deu desconto</span></label><input class="input" id="d_val" type="number" step="0.01" min="0" value="${cheio}"/></div>
+    <div class="kv" id="d_diff" style="display:none;color:#e8618c"><span>🏷️ Desconto dado</span><b>—</b></div>
+  `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="d_save">Concluir e lançar no caixa</button>`);
+  const upd = () => {
+    const v = +$('#d_val').value || 0, diff = cheio - v, el = $('#d_diff');
+    if (diff > 0.005 && cheio > 0) { el.style.display = ''; el.querySelector('b').textContent = fmt(diff) + ' (' + Math.round(diff / cheio * 100) + '%)'; }
+    else el.style.display = 'none';
+  };
+  $('#d_val').oninput = upd;
+  $('#d_save').onclick = () => {
+    const v = parseFloat($('#d_val').value);
+    if (!(v >= 0)) return toast('Informe um valor válido.', 'warn');
+    a.status = 'concluido'; a.charged = v;
+    if (v > 0) state.transactions.push({ id: uid(), type: 'in', category: 'Atendimentos', amount: +v.toFixed(2), desc: a.serviceName + ' — ' + a.clientName.split(' ')[0] + (v < cheio ? ' (com desconto)' : ''), date: a.date < todayISO() ? a.date : todayISO(), clientId: a.clientId });
+    const sv = state.services.find(s => s.id === a.serviceId); if (sv) deduct(sv);   // regra de ouro: estoque baixa só na conclusão
+    save(); closeModal(); render(); toast('Atendimento concluído! ' + fmt(v) + ' no caixa 💰', 'ok');
   };
 }
 function modalCliente() {
@@ -1756,13 +1787,7 @@ const ACTIONS = {
   'edit-item': (id) => modalItem(id),
   'del-item': (id) => { const it = state.inventory.find(i => i.id === id); if (it && confirm('Excluir "' + it.name + '" do estoque?')) { state.inventory = state.inventory.filter(i => i.id !== id); save(); render(); toast('Item removido do estoque.', 'info'); } },
   'comprar-promo': (id) => { const m = state.market.find(x => x.id === id); if (m) modalRepor(m.itemId); },
-  'done-appt': (id) => {
-    const a = state.appointments.find(x => x.id === id); if (!a) return;
-    a.status = 'concluido';
-    state.transactions.push({ id: uid(), type: 'in', category: 'Atendimentos', amount: a.price, desc: a.serviceName + ' — ' + a.clientName.split(' ')[0], date: a.date < todayISO() ? a.date : todayISO(), clientId: a.clientId });
-    const sv = state.services.find(s => s.id === a.serviceId); if (sv) deduct(sv);
-    save(); render(); toast('Atendimento concluído! ' + fmt(a.price) + ' no caixa 💰', 'ok');
-  },
+  'done-appt': (id) => modalDoneAppt(id),
   'edit-appt': (id) => { const a = state.appointments.find(x => x.id === id); if (a) modalAgenda({ editId: id, iso: a.date, time: a.time, cli: a.clientName, serviceId: a.serviceId }); },
   'accept-appt': (id) => {
     const a = state.appointments.find(x => x.id === id); if (!a) return;
@@ -1776,6 +1801,7 @@ const ACTIONS = {
   },
   'cancel-appt': (id) => modalCancelAppt(id),
   'del-appt': (id) => { state.appointments = state.appointments.filter(a => a.id !== id); save(); render(); toast('Agendamento removido.', 'info'); },
+  'edit-tx': (id) => modalTx(null, id),
   'del-tx': (id) => { state.transactions = state.transactions.filter(t => t.id !== id); save(); render(); toast('Lançamento excluído.', 'info'); },
   'del-cliente': (id) => { state.clients = state.clients.filter(c => c.id !== id); save(); render(); toast('Cliente removida.', 'info'); },
   'del-asset': (id) => { state.assets = state.assets.filter(a => a.id !== id); save(); render(); toast('Bem removido.', 'info'); },
