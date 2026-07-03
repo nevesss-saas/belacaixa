@@ -221,14 +221,6 @@ function seed() {
     { id: uid(), name: 'Cabine UV/LED + acessórios', category: 'Equipamento', value: 650, acquiredAt: '2025-04-20' },
   ];
 
-  const market = [
-    { id: uid(), itemId: 'i_acetona', itemName: 'Acetona', supplier: 'Bella Distribuidora', price: 14.4, discount: 22, unit: 'L' },
-    { id: uid(), itemId: 'i_gel', itemName: 'Gel construtor', supplier: 'Distribuidora Prime', price: 31.9, discount: 20, unit: 'pote' },
-    { id: uid(), itemId: 'i_base', itemName: 'Base / Top Coat', supplier: 'Glam Cosméticos', price: 11.5, discount: 18, unit: 'un' },
-    { id: uid(), itemId: 'i_algodao', itemName: 'Algodão', supplier: 'Atacão Beleza', price: 7.9, discount: 20, unit: 'pct' },
-    { id: uid(), itemId: 'i_esmalte', itemName: 'Esmalte (sortido)', supplier: 'Feira da Beleza', price: 4.9, discount: 25, unit: 'un' },
-  ];
-
   // histórico de patrimônio (6 meses)
   const patHist = [];
   for (let m = 5; m >= 0; m--) {
@@ -240,7 +232,7 @@ function seed() {
     v: 1,
     business: { name: 'Nails e Pedicure', reserveTarget: 5000, monthlyGoal: 8000, hours: { open: '09:00', close: '19:00', days: [1, 2, 3, 4, 5, 6], slot: 30 } },
     security: { pinHash: '' },
-    clients, services, inventory: inv, transactions: tx, appointments: appts, assets, market,
+    clients, services, inventory: inv, transactions: tx, appointments: appts, assets,
     patHist, chat: []
   };
 }
@@ -293,13 +285,12 @@ function daysToDeplete(item) {
   if (perDay <= 0) return 999;
   return Math.floor(item.qty / perDay);
 }
-function bestOffer(itemId) { return state.market.filter(m => m.itemId === itemId).sort((a, b) => a.price - b.price)[0]; }
-// lista de compras sugerida p/ os itens no/abaixo do mínimo (qtd sugerida + melhor preço)
+// lista de compras sugerida p/ os itens no/abaixo do mínimo (qtd sugerida ao custo atual)
 function pedidoItens() {
   return lowStock().map(it => {
-    const off = bestOffer(it.id); const price = off ? off.price : it.cost;
+    const price = it.cost;
     const qty = Math.max(it.min, Math.ceil(it.min * 2 - it.qty));
-    return { it, off, price, qty, sub: +(qty * price).toFixed(2) };
+    return { it, price, qty, sub: +(qty * price).toFixed(2) };
   });
 }
 function pedidoTotal() { return pedidoItens().reduce((s, r) => s + r.sub, 0); }
@@ -323,16 +314,13 @@ function getInsights() {
   // estoque
   const low = lowStock();
   if (low.length) {
-    const it = low[0]; const off = bestOffer(it.id);
+    const it = low[0];
     out.push({
       tone: 'amber', ico: '📦', title: `${low.length} item(ns) acabando`,
-      text: `${it.name} está em ${it.qty} ${it.unit} (mín. ${it.min}).` + (off ? ` Achei ${off.discount}% off na ${off.supplier}.` : ''),
+      text: `${it.name} está em ${it.qty} ${it.unit} (mín. ${it.min}). Já está na sua lista de compras.`,
       act: 'go-estoque', actLabel: 'Ver estoque & compras'
     });
   }
-  // promoção destacada
-  const promo = [...state.market].sort((a, b) => b.discount - a.discount)[0];
-  if (promo) out.push({ tone: 'violet', ico: '🛒', title: `Promoção: ${promo.itemName} ${promo.discount}% off`, text: `${promo.supplier} está com ${promo.itemName} por ${fmt(promo.price)}/${promo.unit}. Boa hora pra estocar.`, act: 'go-estoque', actLabel: 'Aproveitar' });
   // caixa livre
   const fc = freeCash();
   if (fc > 300) out.push({ tone: 'blue', ico: '💡', title: `Você tem ${fmt(fc)} de caixa livre`, text: `Acima da sua reserva de ${fmt(state.business.reserveTarget)}. Veja sugestões de onde aplicar.`, act: 'go-patrimonio', actLabel: 'Ver investimentos' });
@@ -376,8 +364,8 @@ function assistantReply(qRaw) {
   if (has('comprar', 'estoque', 'repor', 'acabando', 'falta', 'promo')) {
     const low = lowStock();
     if (!low.length) return 'Seu estoque está saudável ✅ Nenhum item abaixo do mínimo agora. Eu te aviso assim que algo começar a acabar.';
-    const lines = low.map(it => { const o = bestOffer(it.id); return `<li><b>${esc(it.name)}</b> (${it.qty} ${it.unit}, mín ${it.min})${o ? ` → melhor preço: ${esc(o.supplier)} ${fmt(o.price)} (${o.discount}% off)` : ''}</li>`; });
-    return `Você precisa repor <b>${low.length}</b> item(ns):<ul>${lines.join('')}</ul>Quer que eu monte a lista de compras? Vá em <b>Estoque & Compras → Gerar pedido</b>.`;
+    const lines = low.map(it => `<li><b>${esc(it.name)}</b> (${it.qty} ${it.unit}, mín ${it.min})</li>`);
+    return `Você precisa repor <b>${low.length}</b> item(ns):<ul>${lines.join('')}</ul>Eles já entraram sozinhos na sua <b>lista de compras</b> — toque no ⚠️ no topo ou vá em <b>Estoque & Compras → 🛒 Lista de compras</b>.`;
   }
   if (has('cliente', 'fiel', 'melhor cliente', 'frequente')) {
     const ranked = state.clients.map(c => ({ c, s: clientStats(c.id) })).sort((a, b) => b.s.total - a.s.total).slice(0, 3);
@@ -557,8 +545,8 @@ function insightCard(i) {
     <div style="flex:1"><h4>${esc(i.title)}</h4><p>${esc(i.text)}</p>${i.act ? `<button class="btn btn-soft btn-sm" style="margin-top:8px" data-act="${i.act}">${esc(i.actLabel)} →</button>` : ''}</div></div>`;
 }
 function stockRow(it) {
-  const pct = clamp(it.qty / (it.min * 2) * 100, 4, 100); const off = bestOffer(it.id);
-  return `<div style="margin-bottom:12px"><div class="row between" style="margin-bottom:6px"><span>${esc(it.name)} <span class="muted">· ${it.qty} ${it.unit}</span></span>${off ? `<span class="badge b-violet">${off.discount}% off</span>` : ''}</div><div class="bar warn"><i style="width:${pct}%"></i></div></div>`;
+  const pct = clamp(it.qty / (it.min * 2) * 100, 4, 100);
+  return `<div style="margin-bottom:12px"><div class="row between" style="margin-bottom:6px"><span>${esc(it.name)} <span class="muted">· ${it.qty} ${it.unit}</span></span></div><div class="bar warn"><i style="width:${pct}%"></i></div></div>`;
 }
 
 /* ---------- FINANCEIRO ---------- */
@@ -737,7 +725,7 @@ function suggestSlot() {
 
 /* ---------- ESTOQUE & COMPRAS ---------- */
 VIEWS.estoque = {
-  title: 'Estoque & Compras', subtitle: 'IA que monitora consumo e caça promoções',
+  title: 'Estoque & Compras', subtitle: 'Alertas de reposição e lista de compras automática',
   html() {
     const low = lowStock();
     const inv = [...state.inventory].sort((a, b) => daysToDeplete(a) - daysToDeplete(b));
@@ -745,7 +733,7 @@ VIEWS.estoque = {
     <div class="section-head"><div class="grid cols-3" style="flex:1;max-width:600px">
       ${miniStat('📦', 'Itens', state.inventory.length)}
       ${miniStat('⚠️', 'Precisam repor', low.length)}
-      ${miniStat('🛒', 'Promoções ativas', state.market.length)}
+      ${miniStat('🛒', 'Na lista de compras', (state.shoppingList || []).length)}
     </div><div class="row"><button class="btn btn-outline" data-act="new-item">＋ Item</button><button class="btn btn-primary" data-act="gerar-pedido">🛒 Lista de compras</button></div></div>
 
     ${low.length ? `<div class="insight tone-amber mt" style="max-width:none"><div class="ins-ico" style="background:#fef3df">🛒</div>
@@ -756,11 +744,10 @@ VIEWS.estoque = {
         <button class="btn btn-primary btn-sm" style="margin-top:12px" data-act="gerar-pedido">🛒 Ver lista de compras (~${fmt(pedidoTotal())}) →</button>
       </div></div>` : ''}
 
-    <div class="grid cols-2 mt">
-      <div class="card">
-        <div class="section-head"><h2>📦 Meu estoque</h2></div>
-        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Item</th><th class="num">Qtd</th><th>Status</th><th class="num">Dura ~</th><th></th></tr></thead>
-        <tbody>${inv.map(it => {
+    <div class="card mt">
+      <div class="section-head"><h2>📦 Meu estoque</h2></div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Item</th><th class="num">Qtd</th><th>Status</th><th class="num">Dura ~</th><th></th></tr></thead>
+      <tbody>${inv.map(it => {
       const d = daysToDeplete(it); const st = it.qty <= it.min ? ['b-red', 'Repor'] : it.qty <= it.min * 1.4 ? ['b-amber', 'Atenção'] : ['b-green', 'OK'];
       return `<tr><td><b>${esc(it.name)}</b><div class="muted" style="font-size:12.5px">${esc(it.category)} · ${esc(it.supplier)}</div></td>
         <td class="num">${it.qty} ${it.unit}</td><td><span class="badge ${st[0]}">${st[1]}</span></td>
@@ -771,18 +758,6 @@ VIEWS.estoque = {
           <button class="ib ib-ghost ib-sm" data-act="del-item" data-id="${it.id}" title="Excluir item">🗑️</button>
         </div></td></tr>`;
     }).join('')}</tbody></table></div>
-      </div>
-
-      <div class="card">
-        <div class="section-head"><div><h2>🛒 Promoções no mercado</h2><span class="sh-sub">Matéria-prima monitorada pela IA</span></div></div>
-        ${[...state.market].sort((a, b) => b.discount - a.discount).map(m => {
-      const it = state.inventory.find(i => i.id === m.itemId);
-      const save = it ? Math.max(0, it.cost - m.price) : 0;
-      return `<div class="row between" style="padding:12px 0;border-bottom:1px dashed var(--line)">
-        <div><b>${esc(m.itemName)}</b> <span class="badge b-red" style="margin-left:4px">${m.discount}% off</span><div class="muted" style="font-size:13px">${esc(m.supplier)} · ${fmt(m.price)}/${m.unit}${save > 0 ? ` · economiza ${fmt(save)}/un` : ''}</div></div>
-        <button class="btn btn-soft btn-sm" data-act="comprar-promo" data-id="${m.id}">Comprar</button></div>`;
-    }).join('')}
-      </div>
     </div>`;
   }
 };
@@ -1541,10 +1516,10 @@ function modalAsset() {
 }
 function modalRepor(id) {
   const it = state.inventory.find(i => i.id === id); if (!it) return;
-  const off = bestOffer(id); const price = off ? off.price : it.cost; const sup = off ? off.supplier : it.supplier;
+  const price = it.cost;
   const sugQty = Math.max(it.min, Math.ceil(it.min * 2 - it.qty));
   openModal('Repor ' + esc(it.name), `
-    <p class="muted" style="margin-bottom:12px">Estoque atual: <b>${it.qty} ${it.unit}</b> · mínimo ${it.min}${off ? ` · 🛒 melhor preço: <b>${esc(sup)}</b> ${fmt(price)}/${it.unit} <span class="badge b-red">${off.discount}% off</span>` : ''}</p>
+    <p class="muted" style="margin-bottom:12px">Estoque atual: <b>${it.qty} ${it.unit}</b> · mínimo ${it.min}${it.supplier && it.supplier !== '—' ? ` · fornecedor: <b>${esc(it.supplier)}</b>` : ''}</p>
     <div class="field-row"><div class="field"><label>Quantidade a comprar</label><input class="input" id="r_qty" type="number" step="0.01" value="${sugQty}"/></div><div class="field"><label>Preço unit. (R$)</label><input class="input" id="r_price" type="number" step="0.01" value="${price}"/></div></div>
     <div class="field"><label>Desconto (%) <span class="muted" style="font-weight:400">— opcional, ex.: promoção do fornecedor</span></label><input class="input" id="r_disc" type="number" step="0.01" min="0" max="100" value="0" placeholder="0"/></div>
     <div class="kv mt"><span>Total estimado</span><b id="r_total">${fmt(sugQty * price)}</b></div>
@@ -1567,7 +1542,7 @@ function modalRepor(id) {
     const eff = +(p * (1 - d / 100)).toFixed(2);      // preço unit. já com desconto = o que foi pago
     const total = +(q * eff).toFixed(2);
     it.qty = +(it.qty + q).toFixed(2); it.cost = eff;
-    if ($('#r_cash').checked) state.transactions.push({ id: uid(), type: 'out', category: 'Matéria-prima', amount: total, desc: 'Compra: ' + it.name + (off ? ' (' + sup + ')' : '') + (d > 0 ? ' · −' + (+d.toFixed(2)) + '% desc' : ''), date: todayISO() });
+    if ($('#r_cash').checked) state.transactions.push({ id: uid(), type: 'out', category: 'Matéria-prima', amount: total, desc: 'Compra: ' + it.name + (d > 0 ? ' · −' + (+d.toFixed(2)) + '% desc' : ''), date: todayISO() });
     save(); closeModal(); render(); toast('Estoque reposto! +' + q + ' ' + it.unit + (d > 0 ? ' (−' + (+d.toFixed(2)) + '%)' : ''), 'ok');
   };
 }
@@ -1598,8 +1573,8 @@ function modalListaCompras() {
   syncShoppingList();
   const rows = (state.shoppingList || []).map(e => {
     const it = state.inventory.find(i => i.id === e.itemId); if (!it) return null;
-    const off = bestOffer(it.id); const price = off ? off.price : it.cost;
-    return { e, it, off, price, sub: +(e.qty * price).toFixed(2) };
+    const price = it.cost;
+    return { e, it, price, sub: +(e.qty * price).toFixed(2) };
   }).filter(Boolean);
   if (!rows.length) { toast('Estoque saudável — nada na lista de compras ✅', 'ok'); return; }
   const falta = () => rows.filter(r => !r.e.done).reduce((s, r) => s + r.sub, 0);
@@ -1610,7 +1585,7 @@ function modalListaCompras() {
         <label class="row" style="gap:10px;flex:1;cursor:pointer;align-items:flex-start">
           <input type="checkbox" data-shop="${r.e.id}" ${r.e.done ? 'checked' : ''} style="width:auto;margin-top:3px"/>
           <span><b class="shop-name">${esc(r.it.name)}</b> — comprar ${r.e.qty} ${esc(r.it.unit)}
-          <span class="muted" style="font-size:12.5px;display:block">tem ${r.it.qty}/${r.it.min} ${esc(r.it.unit)} · ${esc(r.off ? r.off.supplier : r.it.supplier)} ${fmt(r.price)}/${esc(r.it.unit)}${r.off ? ` <span class="badge b-red">${r.off.discount}% off</span>` : ''} · ~${fmt(r.sub)}</span></span>
+          <span class="muted" style="font-size:12.5px;display:block">tem ${r.it.qty}/${r.it.min} ${esc(r.it.unit)}${r.it.supplier && r.it.supplier !== '—' ? ' · ' + esc(r.it.supplier) : ''} · ${fmt(r.price)}/${esc(r.it.unit)} · ~${fmt(r.sub)}</span></span>
         </label>
         <button class="btn btn-soft btn-sm" data-act="repor-item" data-id="${r.it.id}">Repor</button>
       </div>`).join('')}
@@ -1843,7 +1818,6 @@ const ACTIONS = {
   'repor-item': (id) => modalRepor(id),
   'edit-item': (id) => modalItem(id),
   'del-item': (id) => { const it = state.inventory.find(i => i.id === id); if (it && confirm('Excluir "' + it.name + '" do estoque?')) { state.inventory = state.inventory.filter(i => i.id !== id); save(); render(); toast('Item removido do estoque.', 'info'); } },
-  'comprar-promo': (id) => { const m = state.market.find(x => x.id === id); if (m) modalRepor(m.itemId); },
   'done-appt': (id) => modalDoneAppt(id),
   'edit-appt': (id) => { const a = state.appointments.find(x => x.id === id); if (a) modalAgenda({ editId: id, iso: a.date, time: a.time, cli: a.clientName, serviceId: a.serviceId }); },
   'accept-appt': (id) => {
@@ -1990,7 +1964,7 @@ function modalGoldAgenda() {
     <p class="muted" style="margin:0 0 12px">Ative o link de agendamento: ele mostra seus serviços, consulta sua agenda em tempo real e reserva o horário na hora — sem você precisar responder. E o melhor: assim que o atendimento acontece, a receita já entra no seu fluxo de caixa, como sempre.</p>
     <ul style="list-style:none;padding:0;margin:0 0 14px;font-size:13.5px;display:flex;flex-direction:column;gap:6px">
       <li>✔️ Fluxo de caixa, clientes, agenda e estoque</li>
-      <li>✔️ IA de compras e promoções</li>
+      <li>✔️ Alertas de estoque e lista de compras automática</li>
       <li>✔️ Assistente inteligente (respostas sobre seus números)</li>
       <li>✨ <b>Agendamento automático das clientes</b></li>
     </ul>
