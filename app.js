@@ -635,7 +635,7 @@ VIEWS.clientes = {
           <td class="muted">${c.birthday ? c.birthday.split('-').reverse().join('/') : '—'}</td>
           <td class="num">${s.visits}</td><td class="num">${fmt(s.total)}</td>
           <td class="muted">${s.last ? fmtDateFull(s.last) : '—'}</td>
-          <td class="num"><button class="modal-x" data-act="del-cliente" data-id="${c.id}" title="Excluir">🗑️</button></td></tr>`).join('')}</tbody>
+          <td class="num" style="white-space:nowrap"><button class="modal-x" data-act="edit-cliente" data-id="${c.id}" title="Editar cliente">✏️</button><button class="modal-x" data-act="del-cliente" data-id="${c.id}" title="Excluir">🗑️</button></td></tr>`).join('')}</tbody>
       </table></div>
     </div>`;
   }
@@ -1327,16 +1327,21 @@ function modalDoneAppt(id) {
     save(); closeModal(); render(); toast('Atendimento concluído! ' + fmt(v) + ' no caixa 💰', 'ok');
   };
 }
-function modalCliente() {
-  openModal('Novo cliente', `
-    <div class="field"><label>Nome</label><input class="input" id="c_name" placeholder="Nome completo"/></div>
-    <div class="field-row"><div class="field"><label>Telefone</label><input class="input" id="c_phone" placeholder="(11) 9...."/></div><div class="field"><label>Aniversário (dd-mm)</label><input class="input" id="c_bday" placeholder="15-08"/></div></div>
-    <div class="field"><label>Observações</label><textarea id="c_notes" placeholder="Preferências, alergias, esmalte favorito..."></textarea></div>
+function modalCliente(editId) {
+  // com editId, edita a ficha existente (mantém id, vínculos e data de cadastro)
+  const c = editId ? state.clients.find(x => x.id === editId) : null;
+  if (editId && !c) return;
+  openModal(c ? '✏️ Editar cliente' : 'Novo cliente', `
+    <div class="field"><label>Nome</label><input class="input" id="c_name" placeholder="Nome completo" value="${c ? esc(c.name) : ''}"/></div>
+    <div class="field-row"><div class="field"><label>Telefone</label><input class="input" id="c_phone" placeholder="(11) 9...." value="${c ? esc(c.phone || '') : ''}"/></div><div class="field"><label>Aniversário (dd-mm)</label><input class="input" id="c_bday" placeholder="15-08" value="${c ? esc(c.birthday || '') : ''}"/></div></div>
+    <div class="field"><label>Observações</label><textarea id="c_notes" placeholder="Preferências, alergias, esmalte favorito...">${c ? esc(c.notes || '') : ''}</textarea></div>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="c_save">Salvar</button>`);
   $('#c_save').onclick = () => {
     const name = $('#c_name').value.trim(); if (!name) return toast('Informe o nome.', 'warn');
-    state.clients.push({ id: 'c_' + uid(), name, phone: $('#c_phone').value.trim(), birthday: $('#c_bday').value.trim(), notes: $('#c_notes').value.trim(), createdAt: todayISO() });
-    save(); closeModal(); render(); toast('Cliente cadastrada 💖', 'ok');
+    const data = { name, phone: $('#c_phone').value.trim(), birthday: $('#c_bday').value.trim(), notes: $('#c_notes').value.trim() };
+    if (c) Object.assign(c, data);
+    else state.clients.push({ id: 'c_' + uid(), ...data, createdAt: todayISO() });
+    save(); closeModal(); render(); toast(c ? 'Cliente atualizada ✨' : 'Cliente cadastrada 💖', 'ok');
   };
 }
 // --- Cruzamento cliente↔agendamento: casa por TELEFONE (só dígitos, sem DDI) e, se não, por nome ---
@@ -1807,7 +1812,8 @@ const ACTIONS = {
   'del-appt': (id) => { state.appointments = state.appointments.filter(a => a.id !== id); save(); render(); toast('Agendamento removido.', 'info'); },
   'edit-tx': (id) => modalTx(null, id),
   'del-tx': (id) => { state.transactions = state.transactions.filter(t => t.id !== id); save(); render(); toast('Lançamento excluído.', 'info'); },
-  'del-cliente': (id) => { state.clients = state.clients.filter(c => c.id !== id); save(); render(); toast('Cliente removida.', 'info'); },
+  'edit-cliente': (id) => modalCliente(id),
+  'del-cliente': (id) => { const c = state.clients.find(x => x.id === id); if (c && confirm('Excluir a ficha de "' + c.name + '"? O histórico de atendimentos dela continua no caixa.')) { state.clients = state.clients.filter(x => x.id !== id); save(); render(); toast('Cliente removida.', 'info'); } },
   'del-asset': (id) => { state.assets = state.assets.filter(a => a.id !== id); save(); render(); toast('Bem removido.', 'info'); },
 };
 document.addEventListener('click', e => {
