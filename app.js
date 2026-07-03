@@ -776,7 +776,7 @@ function svcMatsHTML(s) {
     : '<div class="svc-recipe"><span class="svc-mat svc-mat-none">Sem baixa de estoque</span></div>';
 }
 VIEWS.servicos = {
-  title: 'Serviços', subtitle: 'Cadastre seus serviços e ajuste os preços quando quiser',
+  title: 'Catálogo de serviços', subtitle: 'Cadastre seus serviços e ajuste os preços quando quiser',
   html() {
     const list = state.services || [];
     const cards = list.map(s => `
@@ -1413,17 +1413,29 @@ function modalRepor(id) {
   openModal('Repor ' + esc(it.name), `
     <p class="muted" style="margin-bottom:12px">Estoque atual: <b>${it.qty} ${it.unit}</b> · mínimo ${it.min}${off ? ` · 🛒 melhor preço: <b>${esc(sup)}</b> ${fmt(price)}/${it.unit} <span class="badge b-red">${off.discount}% off</span>` : ''}</p>
     <div class="field-row"><div class="field"><label>Quantidade a comprar</label><input class="input" id="r_qty" type="number" step="0.01" value="${sugQty}"/></div><div class="field"><label>Preço unit. (R$)</label><input class="input" id="r_price" type="number" step="0.01" value="${price}"/></div></div>
+    <div class="field"><label>Desconto (%) <span class="muted" style="font-weight:400">— opcional, ex.: promoção do fornecedor</span></label><input class="input" id="r_disc" type="number" step="0.01" min="0" max="100" value="0" placeholder="0"/></div>
     <div class="kv mt"><span>Total estimado</span><b id="r_total">${fmt(sugQty * price)}</b></div>
+    <div class="kv" id="r_econ" style="display:none;color:#00b389"><span>💰 Você economiza</span><b>—</b></div>
     <label class="row" style="gap:8px;font-size:14px;margin-top:10px"><input type="checkbox" id="r_cash" checked style="width:auto"/> Lançar como saída no caixa</label>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="r_save">Confirmar compra</button>`);
-  const upd = () => $('#r_total').textContent = fmt((+$('#r_qty').value || 0) * (+$('#r_price').value || 0));
-  $('#r_qty').oninput = upd; $('#r_price').oninput = upd;
+  const reporDisc = () => Math.min(100, Math.max(0, +$('#r_disc').value || 0));
+  const upd = () => {
+    const q = +$('#r_qty').value || 0, p = +$('#r_price').value || 0, d = reporDisc();
+    const full = q * p, total = full * (1 - d / 100);
+    $('#r_total').textContent = fmt(total);
+    const econ = $('#r_econ');
+    if (d > 0 && full > 0) { econ.style.display = ''; econ.querySelector('b').textContent = fmt(full - total) + ' (' + (+d.toFixed(2)) + '% off)'; }
+    else econ.style.display = 'none';
+  };
+  $('#r_qty').oninput = upd; $('#r_price').oninput = upd; $('#r_disc').oninput = upd;
   $('#r_save').onclick = () => {
-    const q = +$('#r_qty').value, p = +$('#r_price').value;
+    const q = +$('#r_qty').value, p = +$('#r_price').value, d = reporDisc();
     if (!(q > 0)) return toast('Informe a quantidade.', 'warn');
-    it.qty = +(it.qty + q).toFixed(2); it.cost = p;
-    if ($('#r_cash').checked) state.transactions.push({ id: uid(), type: 'out', category: 'Matéria-prima', amount: +(q * p).toFixed(2), desc: 'Compra: ' + it.name + (off ? ' (' + sup + ')' : ''), date: todayISO() });
-    save(); closeModal(); render(); toast('Estoque reposto! +' + q + ' ' + it.unit, 'ok');
+    const eff = +(p * (1 - d / 100)).toFixed(2);      // preço unit. já com desconto = o que foi pago
+    const total = +(q * eff).toFixed(2);
+    it.qty = +(it.qty + q).toFixed(2); it.cost = eff;
+    if ($('#r_cash').checked) state.transactions.push({ id: uid(), type: 'out', category: 'Matéria-prima', amount: total, desc: 'Compra: ' + it.name + (off ? ' (' + sup + ')' : '') + (d > 0 ? ' · −' + (+d.toFixed(2)) + '% desc' : ''), date: todayISO() });
+    save(); closeModal(); render(); toast('Estoque reposto! +' + q + ' ' + it.unit + (d > 0 ? ' (−' + (+d.toFixed(2)) + '%)' : ''), 'ok');
   };
 }
 function modalPedido() {
@@ -1497,7 +1509,7 @@ function modalLinkAgendamento() {
   }
   if (!(state.services || []).length) {
     openModal('🔗 Link de agendamento', `<p>Cadastre pelo menos um <b>serviço</b> antes de divulgar o link — é o que a cliente escolhe na hora de agendar.</p>`,
-      `<button class="btn btn-ghost" data-close>Fechar</button><button class="btn btn-primary" id="lk_svc">Ir para Serviços</button>`);
+      `<button class="btn btn-ghost" data-close>Fechar</button><button class="btn btn-primary" id="lk_svc">Ir para o Catálogo</button>`);
     $('#lk_svc').onclick = () => { closeModal(); setView('servicos'); };
     return;
   }
