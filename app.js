@@ -844,14 +844,15 @@ VIEWS.assistente = {
 
 /* ---------- SERVIÇOS ---------- */
 function svcMatsHTML(s) {
-  const chips = (s.mat || []).map(([id, q]) => {
+  const rows = (s.mat || []).map(([id, q]) => {
     const it = (state.inventory || []).find(i => i.id === id);
     if (!it) return '';
-    return `<span class="svc-mat">📦 ${esc(it.name)} · ${q}${it.unit ? ' ' + esc(it.unit) : ''}</span>`;
+    const unit = it.unit ? ' ' + esc(it.unit) : '';
+    return `<div class="svc-mat"><span class="svc-mat-name">${esc(it.name)}</span><span class="svc-mat-qty">${q}${unit}</span></div>`;
   }).filter(Boolean).join('');
-  return chips
-    ? `<div class="svc-recipe">${chips}</div>`
-    : '<div class="svc-recipe"><span class="svc-mat svc-mat-none">Sem baixa de estoque</span></div>';
+  return rows
+    ? `<div class="svc-recipe"><div class="svc-recipe-head">📦 Baixa no estoque</div>${rows}</div>`
+    : '<div class="svc-recipe"><div class="svc-mat svc-mat-none">Sem baixa de estoque</div></div>';
 }
 VIEWS.servicos = {
   title: 'Catálogo de serviços', subtitle: 'Cadastre seus serviços e ajuste os preços quando quiser',

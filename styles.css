@@ -455,9 +455,12 @@ textarea{resize:vertical;min-height:70px}
 .svc-actions{display:flex;gap:6px;flex:0 0 auto;align-self:flex-start}
 /* receita de materiais do serviço */
 .svc-card{align-items:flex-start}
-.svc-recipe{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
-.svc-mat{font-size:11px;font-weight:600;color:var(--violet);background:#f3e8ff;border:1px solid #e6d4ff;border-radius:999px;padding:3px 9px}
-.svc-mat-none{color:var(--ink-3);background:#f4f0f6;border-color:var(--line);font-weight:500}
+.svc-recipe{display:flex;flex-direction:column;gap:4px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+.svc-recipe-head{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);margin-bottom:1px}
+.svc-mat{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12px;background:#faf6ff;border:1px solid #efe4fb;border-radius:8px;padding:5px 9px}
+.svc-mat-name{color:var(--ink);font-weight:600;line-height:1.25;word-break:break-word}
+.svc-mat-qty{color:var(--violet);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.svc-mat-none{color:var(--ink-3);background:#f6f3f8;border-color:var(--line);font-weight:500;justify-content:flex-start}
 /* editor de materiais no modal de serviço */
 .sv-mats{display:flex;flex-direction:column;gap:8px}
 .sv-mat-row{display:flex;align-items:center;gap:8px}
