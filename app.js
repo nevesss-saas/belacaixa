@@ -27,6 +27,8 @@ let state = null;          // carregado da nuvem após login
 let sb = null;             // cliente Supabase
 let currentUser = null;    // usuária logada
 let demoMode = false;      // demonstração navegável (sem login, sem nuvem)
+let lastCloudStamp = null; // updatedAt que sabemos estar salvo na nuvem (trava otimista)
+let rtChannel = null;      // canal Supabase Realtime da linha do tenant (reservas ao vivo)
 const ADMIN_EMAIL = 'celula.ruach18@gmail.com';   // administrador que vê o painel
 const isAdmin = () => !demoMode && !!currentUser && (currentUser.email || '').toLowerCase() === ADMIN_EMAIL;
 
@@ -43,16 +45,92 @@ async function cloudLoad() {
   if (!sb || !currentUser) return;
   const { data: row, error } = await sb.from('tenant_state').select('data').eq('user_id', currentUser.id).maybeSingle();
   if (error) { console.error(error); toast('Não consegui carregar seus dados.', 'warn'); }
-  if (row && row.data && row.data.v === 1) state = row.data;
-  else { state = starterState(); await cloudSaveNow(); }
+  if (row && row.data && row.data.v === 1) { state = row.data; lastCloudStamp = state.updatedAt != null ? state.updatedAt : null; }
+  else { state = starterState(); lastCloudStamp = null; await cloudSaveNow(); }
 }
 function save() { cloudSaveNow(); }   // mesma assinatura usada no app inteiro (fire-and-forget)
+
+// Mescla no estado local só as RESERVAS DO LINK pendentes que ainda não temos —
+// é o que o book-hold adiciona. Nunca perde uma reserva que chegou pela nuvem, e
+// NÃO re-adiciona atendimentos normais que o dono possa ter apagado localmente.
+function mergeRemoteLinkHolds(remote) {
+  if (!state || !remote || !Array.isArray(remote.appointments)) return [];
+  const have = new Set((state.appointments || []).map(a => a && a.id));
+  const add = remote.appointments.filter(a => a && a.pending && a.source === 'link' && !have.has(a.id));
+  if (add.length) state.appointments = (state.appointments || []).concat(add);
+  return add;
+}
+// Puxa o estado mais novo da nuvem e mescla as reservas do link (usado no conflito de gravação).
+async function pullAndMergeRemote() {
+  try {
+    const { data: row, error } = await sb.from('tenant_state').select('data').eq('user_id', currentUser.id).maybeSingle();
+    if (error || !row || !row.data) return false;
+    const remote = row.data;
+    const added = mergeRemoteLinkHolds(remote);
+    lastCloudStamp = remote.updatedAt != null ? remote.updatedAt : lastCloudStamp;
+    if (added.length && !document.querySelector('.modal-bg')) render();
+    return true;
+  } catch (e) { console.error('pull error', e); return false; }
+}
 async function cloudSaveNow() {
   if (demoMode) return;                        // demonstração nunca persiste na nuvem
   if (!sb || !currentUser || !state) return;
-  state.updatedAt = Date.now();
-  try { await sb.from('tenant_state').upsert({ user_id: currentUser.id, data: state, updated_at: new Date().toISOString() }); }
-  catch (e) { console.error('save error', e); }
+
+  // 1ª gravação (linha ainda não existe / não sabemos o que há na nuvem): upsert simples
+  if (lastCloudStamp == null) {
+    state.updatedAt = Date.now();
+    try {
+      const { error } = await sb.from('tenant_state').upsert({ user_id: currentUser.id, data: state, updated_at: new Date().toISOString() });
+      if (error) { console.error('save error', error); return; }
+      lastCloudStamp = state.updatedAt;
+    } catch (e) { console.error('save error', e); }
+    return;
+  }
+
+  // Gravação com TRAVA OTIMISTA: só escreve se a nuvem ainda está no stamp que conhecemos.
+  // Se uma reserva do link entrou no meio, puxa+mescla e tenta de novo (não perde a reserva).
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const guard = String(lastCloudStamp);
+    state.updatedAt = Date.now();
+    let upd, error;
+    try {
+      ({ data: upd, error } = await sb.from('tenant_state')
+        .update({ data: state, updated_at: new Date().toISOString() })
+        .eq('user_id', currentUser.id).eq('data->>updatedAt', guard)
+        .select('user_id'));
+    } catch (e) { console.error('save error', e); return; }
+    if (error) { console.error('save error', error); return; }
+    if (upd && upd.length) { lastCloudStamp = state.updatedAt; return; }
+    // conflito: a nuvem mudou desde o último load/save → puxa, mescla reservas do link e re-tenta
+    if (!(await pullAndMergeRemote())) return;   // sem ler o novo estado, melhor não sobrescrever
+  }
+  console.warn('cloudSaveNow: conflito persistente após 4 tentativas.');
+}
+
+/* ---- Realtime: a linha do tenant muda (ex.: reserva pelo link) → reflete na hora ---- */
+function onTenantRemoteChange(remote) {
+  if (!remote || !state) return;
+  if (remote.updatedAt != null && remote.updatedAt === state.updatedAt) { lastCloudStamp = remote.updatedAt; return; }  // eco da própria gravação
+  lastCloudStamp = remote.updatedAt != null ? remote.updatedAt : lastCloudStamp;
+  const added = mergeRemoteLinkHolds(remote);
+  if (!added.length) return;
+  toast('🔔 Nova reserva pelo link! Confira na agenda.', 'ok', 6500, { label: 'Ver agenda', onClick: () => setView('agenda') });
+  if (!document.querySelector('.modal-bg')) render();   // não interrompe se um modal estiver aberto
+}
+function subscribeTenantRealtime() {
+  if (!sb || !currentUser) return;
+  unsubscribeTenantRealtime();
+  try {
+    rtChannel = sb.channel('tenant-' + currentUser.id)
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tenant_state', filter: 'user_id=eq.' + currentUser.id },
+        (payload) => onTenantRemoteChange(payload && payload.new && payload.new.data))
+      .subscribe();
+  } catch (e) { console.warn('realtime indisponível', e); }
+}
+function unsubscribeTenantRealtime() {
+  if (rtChannel && sb) { try { sb.removeChannel(rtChannel); } catch (e) {} }
+  rtChannel = null;
 }
 // estado inicial de uma conta nova: modelos prontos, dados operacionais zerados
 function starterState() {
@@ -1767,8 +1845,9 @@ async function onAuthSubmit(e) {
 }
 async function logout() {
   if (demoMode) { exitDemo(); return; }
+  unsubscribeTenantRealtime();
   try { await sb.auth.signOut(); } catch (e) {}
-  currentUser = null; state = null;
+  currentUser = null; state = null; lastCloudStamp = null;
   $('#app').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#landing').hidden = false;
   document.body.style.background = ''; window.scrollTo(0, 0);
   toast('Você saiu da conta.', 'info');
@@ -1936,6 +2015,7 @@ async function enterApp() {
   updatePlanChip();
   const adm = $('#navAdmin'); if (adm) adm.hidden = !isAdmin();
   if (isAdmin()) { const chip = $('#sbPlanChip'); if (chip) chip.textContent = '🛡️ ADMIN'; }
+  subscribeTenantRealtime();  // reservas do link aparecem na agenda sozinhas (sem recarregar)
   render(); window.scrollTo(0, 0);
   consumeBookingDeepLink();   // se veio de um link "1 toque p/ agendar", abre o modal já preenchido
 }
