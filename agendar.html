@@ -98,7 +98,7 @@
             </div>
             <div class="fld">
               <label class="lbl">Horário <span class="req">*</span></label>
-              <input class="input" type="time" id="fTime" value="10:00" />
+              <select class="input" id="fTime"><option value="">Escolha o dia primeiro</option></select>
             </div>
           </div>
           <p id="busyHint" style="display:none;margin:8px 2px 0;font-size:12.5px;color:#b9770f"></p>
@@ -106,15 +106,15 @@
           <label class="lbl">Seu nome <span class="req">*</span></label>
           <input class="input" id="fName" placeholder="Como o salão vai te chamar" autocomplete="name" />
 
-          <label class="lbl">Seu WhatsApp</label>
-          <input class="input" id="fPhone" inputmode="tel" placeholder="(opcional) pra confirmarem com você" autocomplete="tel" />
+          <label class="lbl">Seu WhatsApp <span class="req">*</span></label>
+          <input class="input" id="fPhone" inputmode="tel" placeholder="com DDD — pra reservar e confirmarem com você" autocomplete="tel" />
 
           <label class="lbl">Observação</label>
           <textarea class="input" id="fNote" placeholder="(opcional) ex.: alergia, referência, preferência de cor…"></textarea>
 
-          <button class="go" id="goBtn">💬 Enviar pedido no WhatsApp</button>
-          <p class="fallback" id="fallback">Não abriu sozinho? <a id="fallbackLink" href="#" target="_blank" rel="noopener">Toque aqui pra abrir o WhatsApp</a></p>
-          <p class="note">Isto envia uma <b>solicitação</b> de horário — o salão confirma a disponibilidade com você. 😊</p>
+          <button class="go" id="goBtn">✅ Reservar meu horário</button>
+          <p class="fallback" id="fallback">Não abriu o WhatsApp? <a id="fallbackLink" href="#" target="_blank" rel="noopener">Toque aqui pra avisar o salão</a></p>
+          <p class="note">Seu horário fica <b>reservado na hora</b> 🔒 — o salão confirma com você pelo WhatsApp. 😊</p>
         </div>
       </div>
     </div>
@@ -156,6 +156,7 @@
     function showErr(){ if(loadView) loadView.classList.add('hidden'); if(formView) formView.classList.add('hidden'); errView.classList.remove('hidden'); }
     var SB_URL = 'https://uxrhoxpvdygjfegashdu.supabase.co';
     function hhmmToMin(t){ var p = String(t||'').split(':'); return (+p[0]||0)*60 + (+p[1]||0); }
+    function minToHHMM(m){ m = Math.max(0, m|0); return String((m/60|0)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
     function fetchBooking(sid){
       return fetch(SB_URL + '/functions/v1/booking-info?s=' + encodeURIComponent(sid))
         .then(function(r){ return r.ok ? r.json() : null; }).catch(function(){ return null; });
@@ -179,10 +180,17 @@
       document.getElementById('bizName').textContent = biz;
       document.title = 'Agende na ' + biz + ' 💅';
 
-      // data mínima = hoje
+      // expediente do salão (com padrões) — só oferecemos horários dentro dele
+      var oh = data.oh || { open:'09:00', close:'19:00', days:[1,2,3,4,5,6], slot:30 };
+      if(!Array.isArray(oh.days) || !oh.days.length) oh.days = [1,2,3,4,5,6];
+      function isOpenDay(dstr){ var q = String(dstr||'').split('-'); if(q.length!==3) return true; var dd = new Date(+q[0], +q[1]-1, +q[2]); return oh.days.indexOf(dd.getDay()) >= 0; }
+
+      // data mínima = hoje; valor inicial = primeiro dia de atendimento a partir de hoje
       var today = new Date(); var iso = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
       var fDate = document.getElementById('fDate');
+      var fTime = document.getElementById('fTime');
       fDate.min = iso; fDate.value = iso;
+      (function(){ var dd = new Date(today); for(var k=0;k<14;k++){ var di = dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); if(isOpenDay(di)){ fDate.value = di; return; } dd.setDate(dd.getDate()+1); } })();
 
       // horários já ocupados nesse dia (evita 2 clientes no mesmo horário) — só p/ link ?s=
       var busySlots = [], busyDate = '';
@@ -196,15 +204,14 @@
         } else { busyHint.style.display = 'none'; }
       }
       function loadBusy(dt){
-        busySlots = []; busyDate = dt; renderBusyHint();
+        busySlots = []; busyDate = dt; renderBusyHint(); genSlots();
         if(!sid || !dt) return;
         fetch(SB_URL + '/functions/v1/booking-info?s=' + encodeURIComponent(sid) + '&date=' + dt)
           .then(function(r){ return r.ok ? r.json() : null; })
-          .then(function(d){ if(d && Array.isArray(d.busy) && busyDate===dt){ busySlots = d.busy; renderBusyHint(); } })
+          .then(function(d){ if(d && Array.isArray(d.busy) && busyDate===dt){ busySlots = d.busy; renderBusyHint(); genSlots(); } })
           .catch(function(){});
       }
       fDate.addEventListener('change', function(){ loadBusy(fDate.value); });
-      loadBusy(fDate.value);
 
       // lista de serviços (radio cards)
       var list = document.getElementById('svcList');
@@ -222,53 +229,110 @@
         Array.prototype.forEach.call(list.querySelectorAll('.svc'), function(c){
           c.classList.toggle('on', c.querySelector('input').checked);
         });
+        genSlots();
       });
 
       function pickedSvc(){
+        if(!list) return null;
         var r = list.querySelector('input[name="svc"]:checked');
         return r ? data.s[+r.value] : null;
+      }
+      // monta os horários disponíveis do dia: dentro do expediente, que o serviço
+      // caiba antes de fechar, que não estejam ocupados e (se hoje) que não passaram.
+      function genSlots(){
+        var prev = fTime.value;
+        fTime.innerHTML = '';
+        function only(txt){ var o=document.createElement('option'); o.value=''; o.textContent=txt; fTime.appendChild(o); }
+        var date = fDate.value;
+        if(!date){ only('Escolha o dia primeiro'); return; }
+        if(!isOpenDay(date)){ only('Fechado neste dia 😴'); return; }
+        var svc = pickedSvc();
+        var dur = svc ? (svc[2]||60) : 60;
+        var open = hhmmToMin(oh.open), close = hhmmToMin(oh.close), step = oh.slot||30;
+        var nowMin = -1;
+        if(date === iso){ var n = new Date(); nowMin = n.getHours()*60 + n.getMinutes(); }
+        var out = [];
+        for(var t = open; t + dur <= close; t += step){
+          if(t <= nowMin) continue;
+          var te = t + dur, taken = false;
+          if(busyDate === date){ taken = busySlots.some(function(b){ var bs=hhmmToMin(b[0]), be=bs+(b[1]||60); return t < be && bs < te; }); }
+          if(!taken) out.push(t);
+        }
+        if(!out.length){ only(svc ? 'Sem horários livres nesse dia 😕' : 'Escolha o serviço p/ ver os horários'); return; }
+        out.forEach(function(t){ var o=document.createElement('option'); var hh=minToHHMM(t); o.value=hh; o.textContent=hh; fTime.appendChild(o); });
+        if(prev){ for(var j=0;j<fTime.options.length;j++){ if(fTime.options[j].value===prev){ fTime.value=prev; break; } } }
       }
 
       var goBtn = document.getElementById('goBtn');
       var fallback = document.getElementById('fallback');
       var fallbackLink = document.getElementById('fallbackLink');
 
+      function openWa(svc, date, time, name, phone, note){
+        var msg = 'Oi! Reservei um horário 💅\n\n' +
+          '• Serviço: ' + svc[0] + ' — ' + money(svc[1]) + '\n' +
+          '• Data: ' + brDate(date) + '\n' +
+          '• Horário: ' + time + '\n' +
+          '• Nome: ' + name + '\n• WhatsApp: ' + phone +
+          (note ? '\n• Obs: ' + note : '') +
+          '\n\nJá deixei separado na sua agenda, é só confirmar 💜';
+        var url = waLink(wa, msg);
+        fallbackLink.href = url;
+        fallback.style.display = 'block';
+        window.location.href = url;
+      }
+
       goBtn.addEventListener('click', function(){
         var svc = pickedSvc();
-        var date = fDate.value, time = document.getElementById('fTime').value;
+        var date = fDate.value, time = fTime.value;
         var name = document.getElementById('fName').value.trim();
         var phone = document.getElementById('fPhone').value.trim();
         var note = document.getElementById('fNote').value.trim();
 
         if(!svc){ alert('Escolha um serviço 💅'); return; }
         if(!date){ alert('Escolha o dia.'); return; }
-        if(!time){ alert('Escolha o horário.'); return; }
+        if(!isOpenDay(date)){ alert('O salão não atende nesse dia 😴\nEscolha outro, por favor 💜'); return; }
+        if(!time){ alert('Escolha um horário disponível na lista 🕗'); return; }
         if(!name){ alert('Diz seu nome pro salão saber quem é 😊'); document.getElementById('fName').focus(); return; }
+        if(waPhone(phone).length < 12){ alert('Coloque seu WhatsApp com DDD pra reservar 📱'); document.getElementById('fPhone').focus(); return; }
 
-        // evita pedir um horário que já está reservado nesse dia
+        // conflito local (rápido) antes de bater no servidor
         if(busyDate === date && busySlots.length){
           var cs = hhmmToMin(time), ce = cs + (svc[2] || 60);
-          var clash = busySlots.some(function(b){ var bs = hhmmToMin(b[0]), be = bs + (b[1] || 60); return cs < be && bs < ce; });
-          if(clash){ alert('Ops! O horário ' + time + ' já está reservado nesse dia 😅\nEscolha outro, por favor 💜'); return; }
+          if(busySlots.some(function(b){ var bs = hhmmToMin(b[0]), be = bs + (b[1] || 60); return cs < be && bs < ce; })){
+            alert('Ops! O horário ' + time + ' já foi reservado 😅\nEscolha outro, por favor 💜'); loadBusy(date); return;
+          }
         }
 
-        var deep = appBase() + '?ag=' + encodeBk({ n:name, p:phone, s:svc[0], d:date, t:time, o:note });
+        // sem id do salão (link antigo por #token) → não dá pra reservar no servidor; cai no fluxo de aviso
+        if(!sid){ openWa(svc, date, time, name, phone, note); return; }
 
-        var msg = 'Oi! Quero agendar um horário 💅\n\n' +
-          '• Serviço: ' + svc[0] + ' — ' + money(svc[1]) + '\n' +
-          '• Data: ' + brDate(date) + '\n' +
-          '• Horário: ' + time + '\n' +
-          '• Nome: ' + name +
-          (phone ? '\n• WhatsApp: ' + phone : '') +
-          (note ? '\n• Obs: ' + note : '') +
-          '\n\nPode confirmar pra mim? 😊' +
-          '\n——\n📲 (salão) agendar em 1 toque: ' + deep;
-
-        var url = waLink(wa, msg);
-        fallbackLink.href = url;
-        fallback.style.display = 'block';
-        window.location.href = url;
+        goBtn.disabled = true; goBtn.textContent = 'Reservando…';
+        fetch(SB_URL + '/functions/v1/book-hold', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ s:sid, serviceName:svc[0], date:date, time:time, name:name, phone:phone, note:note })
+        })
+        .then(function(r){ return r.json().catch(function(){ return { ok:false }; }); })
+        .then(function(res){
+          goBtn.disabled = false; goBtn.textContent = '✅ Reservar meu horário';
+          if(res && res.ok){
+            if(busyDate === date){ busySlots.push([time, svc[2] || 60]); renderBusyHint(); genSlots(); }
+            openWa(svc, date, time, name, phone, note);
+          } else if(res && (res.reason === 'conflict' || res.reason === 'busy_retry')){
+            alert('Ihh, esse horário acabou de ser reservado por outra pessoa 😅\nEscolha outro, por favor 💜'); loadBusy(date);
+          } else if(res && (res.reason === 'hours' || res.reason === 'day')){
+            alert('Esse horário está fora do expediente do salão 🕗\nEscolha outro, por favor.'); loadBusy(date);
+          } else {
+            // qualquer outra falha: não perde a cliente — manda o pedido pelo WhatsApp mesmo assim
+            openWa(svc, date, time, name, phone, note);
+          }
+        })
+        .catch(function(){
+          goBtn.disabled = false; goBtn.textContent = '✅ Reservar meu horário';
+          openWa(svc, date, time, name, phone, note);
+        });
       });
+
+      loadBusy(fDate.value);   // monta os horários do dia inicial (e busca os ocupados)
     }
   </script>
 </body>

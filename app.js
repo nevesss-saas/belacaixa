@@ -160,7 +160,7 @@ function seed() {
 
   return {
     v: 1,
-    business: { name: 'Nails e Pedicure', reserveTarget: 5000, monthlyGoal: 8000 },
+    business: { name: 'Nails e Pedicure', reserveTarget: 5000, monthlyGoal: 8000, hours: { open: '09:00', close: '19:00', days: [1, 2, 3, 4, 5, 6], slot: 30 } },
     clients, services, inventory: inv, transactions: tx, appointments: appts, assets, market,
     patHist, chat: []
   };
@@ -607,10 +607,20 @@ function waLink(phone, text) {
 }
 function apptRow(a) {
   const cli = (state.clients || []).find(c => c.id === a.clientId);
-  const phone = cli && cli.phone ? cli.phone : '';
+  const phone = (cli && cli.phone) ? cli.phone : (a.phone || '');
   const first = (a.clientName || '').split(' ')[0];
   const biz = (state.business && state.business.name) || 'nosso espaço';
   const dataBR = a.date.split('-').reverse().join('/');
+  // pedido feito pelo link público, ainda aguardando você aceitar (horário já travado pras outras)
+  if (a.pending && a.source === 'link') {
+    return `<div class="row between appt-row" style="padding:12px;border-bottom:1px dashed var(--line);background:#faf6ff;border-radius:12px;margin-bottom:6px">
+      <div class="row" style="gap:12px"><span class="cli-av" style="background:${avColor(a.clientName)}">${initials(a.clientName)}</span>
+        <div><b>${a.time}</b> · ${esc(a.clientName)} <span class="tag-cat" style="background:#f3e8ff;color:#7c3aed">⏳ pedido pelo link</span><div class="muted" style="font-size:13px">${esc(a.serviceName)} · ${fmt(a.price)}${a.phone ? ' · 📞 ' + esc(a.phone) : ''}</div></div></div>
+      <div class="row appt-acts">
+        <button class="btn btn-sm btn-primary" data-act="accept-appt" data-id="${a.id}">✅ Aceitar</button>
+        <button class="modal-x" data-act="cancel-appt" data-id="${a.id}" title="Recusar">×</button>
+      </div></div>`;
+  }
   const msgConfirmar = `Oi ${first}! 💅 Passando pra confirmar seu horário na ${biz}: ${a.serviceName} no dia ${dataBR} às ${a.time}. Posso confirmar? 😊`;
   const msgLembrar = `Oi ${first}! 💜 Lembrete do seu horário na ${biz}: ${a.serviceName} dia ${dataBR} às ${a.time}. Te espero! ✨`;
   const noTel = phone ? '' : ' title="Cliente sem telefone — o WhatsApp vai abrir pra você escolher o contato"';
@@ -620,20 +630,26 @@ function apptRow(a) {
     <div class="row appt-acts">
       <a class="btn btn-sm btn-wa" href="${waLink(phone, msgConfirmar)}" target="_blank" rel="noopener"${noTel}>✅ Confirmar</a>
       <a class="btn btn-sm btn-wa-soft" href="${waLink(phone, msgLembrar)}" target="_blank" rel="noopener"${noTel}>🔔 Lembrar</a>
+      <button class="btn btn-soft btn-sm" data-act="edit-appt" data-id="${a.id}" title="Remarcar horário">✏️</button>
       <button class="btn btn-soft btn-sm" data-act="done-appt" data-id="${a.id}">✓ Concluir</button>
-      <button class="modal-x" data-act="del-appt" data-id="${a.id}" title="Cancelar">×</button>
+      <button class="modal-x" data-act="cancel-appt" data-id="${a.id}" title="Cancelar">×</button>
     </div></div>`;
 }
 function suggestSlot() {
-  const slots = ['09:00', '10:30', '13:00', '14:30', '16:00', '17:30'];
-  for (let off = 0; off < 7; off++) {
+  const h = bizHours();
+  const open = hhmmToMin(h.open), close = hhmmToMin(h.close), step = h.slot || 30;
+  for (let off = 0; off < 14; off++) {
     const d = new Date(); d.setDate(d.getDate() + off); const iso = d.toISOString().slice(0, 10);
-    const taken = state.appointments.filter(a => a.date === iso && a.status === 'agendado').map(a => a.time);
-    for (const s of slots) if (!taken.includes(s) && !(off === 0 && s < new Date().toTimeString().slice(0, 5))) {
+    if (!h.days.includes(d.getDay())) continue;                       // pula dia sem atendimento
+    const nowM = off === 0 ? hhmmToMin(new Date().toTimeString().slice(0, 5)) : -1;
+    const taken = state.appointments.filter(a => a.date === iso && a.status === 'agendado').map(a => hhmmToMin(a.time));
+    for (let t = open; t + 60 <= close; t += step) {
+      if (taken.includes(t) || t <= nowM) continue;
+      const s = minToHHMM(t);
       return { iso, time: s, label: (off === 0 ? 'Hoje ' : dayName(iso) + ' ') + s, full: (off === 0 ? 'hoje' : dayName(iso) + ' (' + fmtDate(iso) + ')') + ' às ' + s };
     }
   }
-  return { iso: todayISO(), time: '09:00', label: '—', full: 'amanhã às 09:00' };
+  return { iso: todayISO(), time: h.open, label: '—', full: 'em breve às ' + h.open };
 }
 
 /* ---------- ESTOQUE & COMPRAS ---------- */
@@ -1160,7 +1176,43 @@ function findClientByContact(name, phone) {
 }
 // --- Conflito de horário (ciente da DURAÇÃO do serviço) → evita 2 clientes no mesmo horário ---
 function hhmmToMin(t) { const p = String(t || '').split(':'); return (+p[0] || 0) * 60 + (+p[1] || 0); }
+function minToHHMM(m) { m = Math.max(0, m | 0); return String((m / 60 | 0)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
 function apptDurMin(a) { const sv = state.services.find(s => s.id === a.serviceId); return (sv && +sv.dur) || 60; }
+/* Expediente do salão (com padrões p/ contas antigas que ainda não configuraram).
+   days = dias da semana atendidos (0=dom … 6=sáb); slot = intervalo entre horários. */
+function bizHours() {
+  const h = (state.business && state.business.hours) || {};
+  return {
+    open: h.open || '09:00',
+    close: h.close || '19:00',
+    days: (Array.isArray(h.days) && h.days.length) ? h.days.map(Number) : [1, 2, 3, 4, 5, 6],
+    slot: +h.slot || 30
+  };
+}
+function isOpenDay(dateISO) {
+  const p = String(dateISO || '').split('-'); if (p.length !== 3) return true;
+  const d = new Date(+p[0], +p[1] - 1, +p[2]);
+  return bizHours().days.includes(d.getDay());
+}
+/* Um horário só é válido se: for dia de atendimento, começar após a abertura
+   e TERMINAR (início + duração) até o fechamento. */
+function withinHours(dateISO, time, dur) {
+  const h = bizHours();
+  if (!isOpenDay(dateISO)) return { ok: false, reason: 'day' };
+  const s = hhmmToMin(time), e = s + (+dur || 60);
+  if (s < hhmmToMin(h.open)) return { ok: false, reason: 'before' };
+  if (e > hhmmToMin(h.close)) return { ok: false, reason: 'after' };
+  return { ok: true };
+}
+/* Reservas feitas pelo link que ficaram penduradas (você não aceitou nem recusou)
+   liberam o horário depois de 24h — evita a agenda entupir de pedido fantasma. */
+const HOLD_TTL_MS = 24 * 60 * 60 * 1000;
+function purgeExpiredHolds() {
+  if (!state || !Array.isArray(state.appointments)) return false;
+  const now = Date.now(), before = state.appointments.length;
+  state.appointments = state.appointments.filter(a => !(a.pending && a.source === 'link' && a.hold && (now - a.hold) > HOLD_TTL_MS));
+  return state.appointments.length !== before;
+}
 function slotConflict(date, time, dur, exceptId) {
   const s = hhmmToMin(time), e = s + (+dur || 60);
   return state.appointments.find(a => {
@@ -1176,20 +1228,44 @@ function modalAgenda(pre) {
   const linkedCli = p.fromLink ? findClientByContact(p.cli, p.phone) : null;
   const opts = state.services.map(s => `<option value="${s.id}"${p.serviceId === s.id ? ' selected' : ''}>${esc(s.name)} — ${fmt(s.price)}</option>`).join('');
   const clopts = state.clients.map(c => `<option value="${esc(c.name)}">`).join('');
-  openModal('Agendar atendimento', `
+  const h = bizHours();
+  openModal(p.editId ? 'Editar / remarcar horário' : 'Agendar atendimento', `
     ${p.fromLink ? `<div class="insight tone-violet" style="margin:0 0 12px;max-width:none"><div class="ins-ico" style="background:#f3e8ff">📲</div><div><h4 style="margin:0">Pedido pelo seu link 💜</h4><p style="margin:2px 0 0">Confira os dados e toque em <b>Agendar</b> pra confirmar.${p.note ? '<br><b>Obs. da cliente:</b> ' + esc(p.note) : ''}<br>${linkedCli ? '✅ <b>Cliente já cadastrada:</b> ' + esc(linkedCli.name) + ' — vou vincular a esta ficha' : '✨ <b>Cliente nova</b> — vou cadastrar ao confirmar'}${p.phone ? ' · 📞 ' + esc(p.phone) : ''}</p></div></div>` : ''}
     <div class="field"><label>Cliente</label><input class="input" id="a_cli" list="adl" placeholder="Nome da cliente" value="${p.cli ? esc(p.cli) : ''}"/><datalist id="adl">${clopts}</datalist></div>
     <div class="field"><label>Serviço</label><select id="a_serv">${opts}</select></div>
     <div class="field-row"><div class="field"><label>Data</label><input class="input" id="a_date" type="date" value="${slot.iso}"/></div><div class="field"><label>Horário</label><input class="input" id="a_time" type="time" value="${slot.time}"/></div></div>
-  `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="a_save">Agendar</button>`);
+    <p class="muted" style="font-size:12.5px;margin:2px 2px 0">🕗 Expediente: ${h.open}–${h.close} · ${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].filter((_, i) => h.days.includes(i)).join(', ')}</p>
+  `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="a_save">${p.editId ? 'Salvar mudança' : 'Agendar'}</button>`);
   $('#a_save').onclick = () => {
     const name = $('#a_cli').value.trim(); if (!name) return toast('Informe a cliente.', 'warn');
     const sv = state.services.find(s => s.id === $('#a_serv').value);
     const date = $('#a_date').value, time = $('#a_time').value;
-    const conf = slotConflict(date, time, sv ? sv.dur : 60, null);
+    const dur = sv ? sv.dur : 60;
+    // fora do expediente? o dono pode forçar (ele manda na própria agenda)
+    const wh = withinHours(date, time, dur);
+    if (!wh.ok) {
+      const hh = bizHours();
+      const msg = wh.reason === 'day'
+        ? '⚠️ ' + dayName(date) + ' não é dia de atendimento (' + ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].filter((_, i) => hh.days.includes(i)).join(', ') + ').'
+        : '⚠️ ' + time + ' está fora do expediente (' + hh.open + '–' + hh.close + ')' + (wh.reason === 'after' ? ' — o serviço terminaria depois do fechamento.' : '.');
+      if (!confirm(msg + '\n\nAgendar assim mesmo?')) return;
+    }
+    const conf = slotConflict(date, time, dur, p.editId || null);
     if (conf) {
       const quem = (conf.clientName || 'outra cliente').split(' ')[0];
       if (!confirm('⚠️ Esse horário bate com ' + quem + ' às ' + conf.time + ' (' + conf.serviceName + ').\n\nAgendar assim mesmo?')) return;
+    }
+    // ----- EDIÇÃO / REMARCAÇÃO de um horário existente -----
+    if (p.editId) {
+      const a = state.appointments.find(x => x.id === p.editId);
+      if (a) {
+        const mudou = (a.date !== date || a.time !== time || a.serviceId !== (sv && sv.id));
+        a.clientName = name; a.date = date; a.time = time;
+        if (sv) { a.serviceId = sv.id; a.serviceName = sv.name; a.price = sv.price; }
+        save(); closeModal(); render();
+        if (mudou) offerReschedNotice(a); else toast('Agendamento atualizado ✨', 'ok');
+      }
+      return;
     }
     let cli = findClientByContact(name, p.phone);
     let novo = false;
@@ -1199,6 +1275,43 @@ function modalAgenda(pre) {
     save(); closeModal(); render();
     toast(novo ? 'Agendado 📅 — cliente nova cadastrada 💜' : 'Agendado 📅 — vinculado a ' + cli.name.split(' ')[0] + ' ✓', 'ok');
   };
+}
+/* Avisos SaaS → WhatsApp (sem Cloud API: abre o WhatsApp com a mensagem pronta,
+   o dono só toca ENVIAR). Cobre remarcar (atualizar) e cancelar (rejeitar). */
+function apptClientPhone(a) { const c = (state.clients || []).find(x => x.id === a.clientId); return c && c.phone ? c.phone : ''; }
+function offerReschedNotice(a) {
+  const phone = apptClientPhone(a);
+  const first = (a.clientName || '').split(' ')[0];
+  const biz = (state.business && state.business.name) || 'nosso espaço';
+  const dataBR = a.date.split('-').reverse().join('/');
+  const msg = `Oi ${first}! 💜 Seu horário na ${biz} foi atualizado: ${a.serviceName} agora no dia ${dataBR} às ${a.time}. Fica bom pra você? 😊`;
+  openModal('Horário atualizado ✨', `<p>Avise <b>${esc(a.clientName)}</b> da mudança pra ela confirmar o novo horário:</p><p class="muted" style="font-size:13px">${esc(a.serviceName)} · ${dataBR} às ${a.time}</p>`,
+    `<button class="btn btn-ghost" data-close>Depois</button><a class="btn btn-wa" href="${waLink(phone, msg)}" target="_blank" rel="noopener"${phone ? '' : ' title="Cliente sem telefone — escolha o contato no WhatsApp"'} data-close>📲 Avisar no WhatsApp</a>`);
+}
+function offerConfirmNotice(a) {
+  const phone = apptClientPhone(a) || a.phone || '';
+  const first = (a.clientName || '').split(' ')[0];
+  const biz = (state.business && state.business.name) || 'nosso espaço';
+  const dataBR = a.date.split('-').reverse().join('/');
+  const msg = `Oi ${first}! ✅ Seu horário na ${biz} está confirmado: ${a.serviceName} dia ${dataBR} às ${a.time}. Te espero! 💜`;
+  openModal('Pedido aceito ✅', `<p>Horário reservado pra <b>${esc(a.clientName)}</b>. Confirme com ela pelo WhatsApp:</p><p class="muted" style="font-size:13px">${esc(a.serviceName)} · ${dataBR} às ${a.time}</p>`,
+    `<button class="btn btn-ghost" data-close>Depois</button><a class="btn btn-wa" href="${waLink(phone, msg)}" target="_blank" rel="noopener"${phone ? '' : ' title="Cliente sem telefone — escolha o contato no WhatsApp"'} data-close>📲 Confirmar no WhatsApp</a>`);
+}
+function modalCancelAppt(id) {
+  const a = state.appointments.find(x => x.id === id); if (!a) return;
+  const phone = apptClientPhone(a);
+  const first = (a.clientName || '').split(' ')[0];
+  const biz = (state.business && state.business.name) || 'nosso espaço';
+  const dataBR = a.date.split('-').reverse().join('/');
+  const msg = `Oi ${first}! Preciso cancelar seu horário na ${biz} (${a.serviceName} dia ${dataBR} às ${a.time}) 😔. Me chama que a gente remarca pra outro dia, tá? 💜`;
+  openModal('Cancelar horário', `
+    <p>Cancelar o horário de <b>${esc(a.clientName)}</b>?</p>
+    <p class="muted" style="font-size:13px">${esc(a.serviceName)} · ${dataBR} às ${a.time}</p>
+    <p class="muted">Antes de remover, avise a cliente pelo WhatsApp pra ela ficar sabendo. 😉</p>
+  `, `<button class="btn btn-ghost" data-close>Voltar</button>
+      <a class="btn btn-wa" href="${waLink(phone, msg)}" target="_blank" rel="noopener"${phone ? '' : ' title="Cliente sem telefone — escolha o contato no WhatsApp"'}>📲 Avisar no WhatsApp</a>
+      <button class="btn btn-danger" id="cx_del">Remover da agenda</button>`);
+  $('#cx_del').onclick = () => { state.appointments = state.appointments.filter(x => x.id !== id); save(); closeModal(); render(); toast('Horário cancelado.', 'info'); };
 }
 function modalItem(id) {
   const it = id ? state.inventory.find(i => i.id === id) : null;
@@ -1343,16 +1456,31 @@ function modalLinkAgendamento() {
 }
 function modalBiz() {
   const b = state.business;
+  const h = bizHours();
+  const diasLbl = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   openModal('Configurações do negócio', `
     <div class="field"><label>Nome do negócio</label><input class="input" id="g_name" value="${esc(b.name)}"/></div>
     <div class="field"><label>📲 WhatsApp do salão <span class="muted" style="font-weight:400">(pra receber os agendamentos das clientes)</span></label><input class="input" id="g_wa" inputmode="tel" placeholder="Ex.: (22) 99244-5995" value="${esc(b.whatsapp || '')}"/></div>
+    <div class="field"><label>🕗 Expediente <span class="muted" style="font-weight:400">(a agenda e o link só oferecem horários dentro dele)</span></label>
+      <div class="field-row">
+        <div class="field"><label class="muted" style="font-weight:500;font-size:13px">Abre às</label><input class="input" id="g_open" type="time" value="${h.open}"/></div>
+        <div class="field"><label class="muted" style="font-weight:500;font-size:13px">Fecha às</label><input class="input" id="g_close" type="time" value="${h.close}"/></div>
+        <div class="field"><label class="muted" style="font-weight:500;font-size:13px">Intervalo</label><select class="input" id="g_slot">${[15, 30, 45, 60].map(m => `<option value="${m}"${h.slot === m ? ' selected' : ''}>${m} min</option>`).join('')}</select></div>
+      </div>
+      <div class="row" id="g_days" style="gap:6px;flex-wrap:wrap;margin-top:8px">
+        ${diasLbl.map((d, i) => `<button type="button" class="btn btn-sm ${h.days.includes(i) ? 'btn-primary' : 'btn-ghost'}" data-d="${i}">${d}</button>`).join('')}
+      </div>
+    </div>
     <div class="field-row"><div class="field"><label>Reserva de emergência alvo (R$)</label><input class="input" id="g_res" type="number" value="${b.reserveTarget}"/></div><div class="field"><label>Meta de faturamento mensal (R$)</label><input class="input" id="g_goal" type="number" value="${b.monthlyGoal}"/></div></div>
     <hr style="border:none;border-top:1px solid var(--line);margin:8px 0 14px">
     <button class="btn btn-danger btn-sm" id="g_reset">↺ Restaurar dados de demonstração</button>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="g_save">Salvar</button>`);
+  $('#g_days').querySelectorAll('button[data-d]').forEach(btn => btn.onclick = () => { btn.classList.toggle('btn-primary'); btn.classList.toggle('btn-ghost'); });
   $('#g_save').onclick = () => {
     b.name = $('#g_name').value.trim() || b.name; b.reserveTarget = +$('#g_res').value || b.reserveTarget; b.monthlyGoal = +$('#g_goal').value || b.monthlyGoal;
     b.whatsapp = waPhone($('#g_wa').value);
+    const days = [...$('#g_days').querySelectorAll('button[data-d]')].filter(x => x.classList.contains('btn-primary')).map(x => +x.dataset.d);
+    b.hours = { open: $('#g_open').value || '09:00', close: $('#g_close').value || '19:00', days: days.length ? days : [1, 2, 3, 4, 5, 6], slot: +$('#g_slot').value || 30 };
     save(); closeModal(); render(); toast('Configurações salvas.', 'ok');
   };
   $('#g_reset').onclick = () => { if (confirm('Isso substitui seus dados pelos de demonstração. Continuar?')) { state = seed(); save(); closeModal(); render(); toast('Dados de demonstração carregados.', 'info'); } };
@@ -1388,6 +1516,18 @@ const ACTIONS = {
     const sv = state.services.find(s => s.id === a.serviceId); if (sv) deduct(sv);
     save(); render(); toast('Atendimento concluído! ' + fmt(a.price) + ' no caixa 💰', 'ok');
   },
+  'edit-appt': (id) => { const a = state.appointments.find(x => x.id === id); if (a) modalAgenda({ editId: id, iso: a.date, time: a.time, cli: a.clientName, serviceId: a.serviceId }); },
+  'accept-appt': (id) => {
+    const a = state.appointments.find(x => x.id === id); if (!a) return;
+    // vincula (ou cria) a ficha da cliente a partir do nome + telefone do pedido
+    let cli = findClientByContact(a.clientName, a.phone);
+    if (!cli) { cli = { id: 'c_' + uid(), name: a.clientName, phone: a.phone || '', birthday: '', notes: '', createdAt: todayISO() }; state.clients.push(cli); }
+    else if (a.phone && !cli.phone) { cli.phone = a.phone; }
+    a.clientId = cli.id; a.clientName = cli.name; a.pending = false;
+    save(); render(); toast('Pedido aceito ✅ — vinculado a ' + cli.name.split(' ')[0], 'ok');
+    offerConfirmNotice(a);
+  },
+  'cancel-appt': (id) => modalCancelAppt(id),
   'del-appt': (id) => { state.appointments = state.appointments.filter(a => a.id !== id); save(); render(); toast('Agendamento removido.', 'info'); },
   'del-tx': (id) => { state.transactions = state.transactions.filter(t => t.id !== id); save(); render(); toast('Lançamento excluído.', 'info'); },
   'del-cliente': (id) => { state.clients = state.clients.filter(c => c.id !== id); save(); render(); toast('Cliente removida.', 'info'); },
@@ -1620,6 +1760,7 @@ async function enterApp() {
   $('#landing').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#app').hidden = false;
   document.body.style.background = 'var(--bg)';
   if (!state) { $('#viewRoot').innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Carregando seus dados…</div>'; await cloudLoad(); }
+  if (purgeExpiredHolds()) save();   // limpa pedidos do link que expiraram (24h sem você tratar)
   await loadSubscription();
   const params = new URLSearchParams(location.search);
   if (params.get('assinatura') === 'sucesso' && !subActive()) { $('#viewRoot').innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Confirmando seu pagamento…</div>'; await pollSub(8); }
