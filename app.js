@@ -11,7 +11,36 @@ const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' 
 const fmt = n => BRL.format(Math.round((n + Number.EPSILON) * 100) / 100);
 const fmtK = n => n >= 1000 ? 'R$ ' + (n / 1000).toFixed(1).replace('.', ',') + 'k' : fmt(n);
 const uid = () => Math.random().toString(36).slice(2, 9);
-const todayISO = () => new Date().toISOString().slice(0, 10);
+/* ---- fuso horário do negócio (padrão: Brasília) ----
+   Antes o "dia" era calculado em UTC, então às 21h de Brasília já virava
+   o dia seguinte. Agora tudo se baseia no fuso configurado pelo salão. */
+const DEFAULT_TZ = 'America/Sao_Paulo';
+function bizTZ() {
+  try { return (state && state.business && state.business.timezone) || DEFAULT_TZ; }
+  catch (_) { return DEFAULT_TZ; }
+}
+// formata um Date como YYYY-MM-DD no fuso do negócio (robusto a qualquer locale)
+function isoInTZ(d, tz) {
+  try {
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone: tz || bizTZ(), year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d);
+    const g = t => p.find(x => x.type === t).value;
+    return `${g('year')}-${g('month')}-${g('day')}`;
+  } catch (_) { return d.toISOString().slice(0, 10); }
+}
+// soma dias a uma data ISO (âncora meio-dia UTC evita saltos de horário de verão)
+function addDaysISO(iso, delta) {
+  const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+// "hoje" (YYYY-MM-DD) no fuso do negócio — não em UTC
+const todayISO = () => isoInTZ(new Date());
+// hora atual HH:MM no fuso do negócio
+function nowHHMM() {
+  try { return new Intl.DateTimeFormat('en-GB', { timeZone: bizTZ(), hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()); }
+  catch (_) { return new Date().toTimeString().slice(0, 5); }
+}
+// data + hora atuais no fuso, pra mostrar ao usuário (ex.: "sex, 04/07/2026 20:11")
+function nowLabelTZ() { return fmtDateFull(todayISO()) + ' ' + nowHHMM(); }
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const monthKey = d => d.slice(0, 7);
 const fmtDate = iso => { const [y, m, d] = iso.split('-'); return `${d}/${m}`; };
@@ -230,7 +259,7 @@ function seed() {
 
   return {
     v: 1,
-    business: { name: 'Nails e Pedicure', reserveTarget: 5000, monthlyGoal: 8000, hours: { open: '09:00', close: '19:00', days: [1, 2, 3, 4, 5, 6], slot: 30 } },
+    business: { name: 'Nails e Pedicure', timezone: DEFAULT_TZ, reserveTarget: 5000, monthlyGoal: 8000, hours: { open: '09:00', close: '19:00', days: [1, 2, 3, 4, 5, 6], slot: 30 } },
     security: { pinHash: '' },
     clients, services, inventory: inv, transactions: tx, appointments: appts, assets,
     patHist, chat: []
@@ -276,7 +305,7 @@ function clientStats(id) {
 }
 // estimativa de consumo diário de um item (com base no nº médio de atendimentos/dia)
 function dailyServices() {
-  const ms = monthStats(curMonthKey()); const day = Math.max(1, new Date().getDate());
+  const ms = monthStats(curMonthKey()); const day = Math.max(1, +todayISO().slice(8, 10));
   const cnt = txOfMonth(curMonthKey()).filter(t => t.category === 'Atendimentos').length;
   return Math.max(1, cnt / day);
 }
@@ -567,9 +596,8 @@ function finInRange(dateISO) {
   if (r === 'month') return monthKey(dateISO) === curMonthKey();
   if (r === 'week' || r === 'fortnight') {
     const n = r === 'week' ? 7 : 15;
-    const start = new Date(); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - (n - 1));
-    const d = new Date(dateISO + 'T00:00:00');
-    return d >= start && d <= new Date(hoje + 'T23:59:59');   // últimos N dias, até hoje
+    const start = addDaysISO(hoje, -(n - 1));                 // início: N-1 dias antes de hoje
+    return dateISO >= start && dateISO <= hoje;               // datas YYYY-MM-DD comparam certo como texto
   }
   if (/^\d{4}-\d{2}$/.test(r)) return monthKey(dateISO) === r;   // mês específico
   return true;
@@ -740,10 +768,12 @@ function apptRow(a) {
 function suggestSlot() {
   const h = bizHours();
   const open = hhmmToMin(h.open), close = hhmmToMin(h.close), step = h.slot || 30;
+  const base = todayISO();
   for (let off = 0; off < 14; off++) {
-    const d = new Date(); d.setDate(d.getDate() + off); const iso = d.toISOString().slice(0, 10);
-    if (!h.days.includes(d.getDay())) continue;                       // pula dia sem atendimento
-    const nowM = off === 0 ? hhmmToMin(new Date().toTimeString().slice(0, 5)) : -1;
+    const iso = addDaysISO(base, off);
+    const dow = new Date(iso + 'T12:00:00Z').getUTCDay();            // dia da semana da data (sem viés de fuso)
+    if (!h.days.includes(dow)) continue;                              // pula dia sem atendimento
+    const nowM = off === 0 ? hhmmToMin(nowHHMM()) : -1;
     const taken = state.appointments.filter(a => a.date === iso && a.status === 'agendado').map(a => hhmmToMin(a.time));
     for (let t = open; t + 60 <= close; t += step) {
       if (taken.includes(t) || t <= nowM) continue;
@@ -1849,10 +1879,21 @@ function modalPinForgot() {
 function modalBiz() {
   const b = state.business;
   const h = bizHours();
+  const tz = b.timezone || DEFAULT_TZ;
   const diasLbl = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const tzOpts = [
+    ['America/Sao_Paulo', 'Brasília (UTC−3) — SP, RJ, MG, Sul, Nordeste, DF'],
+    ['America/Manaus', 'Amazônia (UTC−4) — AM, RO, RR, MT, MS'],
+    ['America/Rio_Branco', 'Acre (UTC−5) — AC e oeste do AM'],
+    ['America/Noronha', 'Fernando de Noronha (UTC−2)'],
+  ];
   openModal('Configurações do negócio', `
     <div class="field"><label>Nome do negócio</label><input class="input" id="g_name" value="${esc(b.name)}"/></div>
     <div class="field"><label>📲 WhatsApp do salão <span class="muted" style="font-weight:400">(pra receber os agendamentos das clientes)</span></label><input class="input" id="g_wa" inputmode="tel" placeholder="Ex.: (22) 99244-5995" value="${esc(b.whatsapp || '')}"/></div>
+    <div class="field"><label>🕐 Fuso horário <span class="muted" style="font-weight:400">(base do "hoje" no caixa e na agenda)</span></label>
+      <select class="input" id="g_tz">${tzOpts.map(([v, l]) => `<option value="${v}"${tz === v ? ' selected' : ''}>${l}</option>`).join('')}</select>
+      <p class="muted" style="font-size:12.5px;margin:6px 2px 0">🕐 Agora no fuso escolhido: <b id="g_tznow">—</b></p>
+    </div>
     <div class="field"><label>🕗 Expediente <span class="muted" style="font-weight:400">(a agenda e o link só oferecem horários dentro dele)</span></label>
       <div class="field-row">
         <div class="field"><label class="muted" style="font-weight:500;font-size:13px">Abre às</label><input class="input" id="g_open" type="time" value="${h.open}"/></div>
@@ -1870,9 +1911,20 @@ function modalBiz() {
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="g_save">Salvar</button>`);
   bindPinSection();
   $('#g_days').querySelectorAll('button[data-d]').forEach(btn => btn.onclick = () => { btn.classList.toggle('btn-primary'); btn.classList.toggle('btn-ghost'); });
+  // relógio ao vivo do fuso escolhido (atualiza no dropdown e a cada 20s)
+  const tzNow = () => {
+    const sel = $('#g_tz').value;
+    try {
+      const hora = new Intl.DateTimeFormat('en-GB', { timeZone: sel, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+      $('#g_tznow').textContent = fmtDateFull(isoInTZ(new Date(), sel)) + ' · ' + hora;
+    } catch (_) { $('#g_tznow').textContent = '—'; }
+  };
+  $('#g_tz').onchange = tzNow; tzNow();
+  const tzTimer = setInterval(() => { if (!$('#g_tznow')) return clearInterval(tzTimer); tzNow(); }, 20000);
   $('#g_save').onclick = () => {
     b.name = $('#g_name').value.trim() || b.name; b.reserveTarget = +$('#g_res').value || b.reserveTarget; b.monthlyGoal = +$('#g_goal').value || b.monthlyGoal;
     b.whatsapp = waPhone($('#g_wa').value);
+    b.timezone = $('#g_tz').value || DEFAULT_TZ;
     const days = [...$('#g_days').querySelectorAll('button[data-d]')].filter(x => x.classList.contains('btn-primary')).map(x => +x.dataset.d);
     b.hours = { open: $('#g_open').value || '09:00', close: $('#g_close').value || '19:00', days: days.length ? days : [1, 2, 3, 4, 5, 6], slot: +$('#g_slot').value || 30 };
     save(); closeModal(); render(); toast('Configurações salvas.', 'ok');
