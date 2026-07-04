@@ -460,6 +460,15 @@ textarea{resize:vertical;min-height:70px}
 .notif-grp-head{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
 .notif-item{padding:8px 11px;background:#faf6ff;border:1px solid #efe4fb;border-radius:8px;margin-bottom:5px;font-size:13.5px;line-height:1.4}
 
+/* ---- comece a investir (educativo) ---- */
+.invest-card{background:linear-gradient(135deg,#f6f0ff,#eafaf4)}
+.step-guide{display:grid;gap:14px;margin:8px 0 14px}
+.sg-item{display:flex;gap:12px}
+.sg-n{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--grad);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.sg-item h4{margin:0 0 4px;font-size:15px}
+.sg-item p{margin:0;color:var(--ink-2);font-size:14px;line-height:1.5}
+.invest-why{background:#f3e8ff;border-radius:12px;padding:12px 14px;font-size:13.5px;color:var(--ink-2);line-height:1.5;margin:0 0 12px}
+
 /* ---- serviços ---- */
 .svc-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:16px}
 .svc-card{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 4px 14px -11px rgba(20,10,40,.4);transition:.15s}

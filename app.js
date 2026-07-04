@@ -374,6 +374,38 @@ function investmentSuggestions() {
   return { fc, list };
 }
 
+// parceria de investimento (link global da empresa; vazio = só conteúdo educativo)
+function investPartner() {
+  try {
+    const p = (window.BELACAIXA_CFG && window.BELACAIXA_CFG.invest) || {};
+    if (!p.partnerUrl) return null;
+    return { name: p.partnerName || 'nosso parceiro', url: p.partnerUrl, bonus: p.partnerBonus || '' };
+  } catch (_) { return null; }
+}
+// passo a passo educativo pra começar a investir (com CTA de parceria, se configurado)
+function modalComoInvestir() {
+  const fc = freeCash(), bal = balance(), reserve = state.business.reserveTarget;
+  const temReserva = bal >= reserve;
+  const intro = temReserva
+    ? `Você tem <b>${fmt(fc)}</b> de caixa livre acima da sua reserva. Dá pra dar o primeiro passo com segurança 👇`
+    : `Você ainda está montando sua reserva de emergência (${fmt(Math.max(0, bal))} de ${fmt(reserve)}). O <b>passo 1</b> abaixo é justamente esse — depois dele, o resto.`;
+  const p = investPartner();
+  const passo2 = p
+    ? `<a class="btn btn-primary btn-block" href="${esc(p.url)}" target="_blank" rel="noopener nofollow sponsored" style="margin-top:8px">🏦 Abrir minha conta no ${esc(p.name)}</a>
+       <p class="muted" style="font-size:12px;margin:6px 2px 0">🔎 Este é um <b>link de indicação/parceria</b> — podemos ganhar uma comissão, <b>sem nenhum custo a mais pra você</b>.${p.bonus ? ' ' + esc(p.bonus) : ''}</p>`
+    : `<p class="muted" style="font-size:12.5px;margin:6px 2px 0">Ex.: Nubank, Inter, C6 ou XP — todas grátis e feitas pelo celular.</p>`;
+  openModal('Comece a investir com segurança', `
+    <p style="margin-top:0">${intro}</p>
+    <div class="step-guide">
+      <div class="sg-item"><span class="sg-n">1</span><div><h4>🛟 Primeiro, a reserva de emergência</h4><p>Guarde de 3 a 6 meses dos seus custos em algo que rende e você saca a qualquer hora (<b>Tesouro Selic</b> ou <b>CDB de liquidez diária</b>). É seu colchão pra imprevistos — só invista o resto depois dela.</p></div></div>
+      <div class="sg-item"><span class="sg-n">2</span><div><h4>🏦 Abra sua conta de investimentos</h4><p>Conta grátis, feita pelo celular em ~10 min (CPF + selfie). É por onde você compra o Tesouro e os CDBs.</p>${passo2}</div></div>
+      <div class="sg-item"><span class="sg-n">3</span><div><h4>📈 Faça o primeiro investimento seguro</h4><p>No app do banco, procure <b>"Tesouro Selic"</b> (ou <b>"CDB 100% do CDI, liquidez diária"</b>). Comece com pouco — R$ 30 já dá. Rende todo dia útil e você resgata quando quiser.</p></div></div>
+    </div>
+    <div class="invest-why"><b>Por que Tesouro Selic / CDB de liquidez diária?</b> São dos investimentos <b>mais seguros</b> do Brasil (o Tesouro é do governo; o CDB tem garantia do FGC até R$ 250 mil), rendem mais que a poupança e você pode sacar quando precisar.</div>
+    <p class="muted" style="font-size:11.5px;margin-bottom:0">⚠️ Conteúdo <b>educativo</b>, não é recomendação de investimento. Invista de acordo com o seu perfil e objetivos.</p>
+  `, `<button class="btn btn-ghost" data-close>Fechar</button>`);
+}
+
 function assistantReply(qRaw) {
   const q = qRaw.toLowerCase();
   const cur = monthStats(curMonthKey()), prev = monthStats(prevMonthKey());
@@ -388,7 +420,7 @@ function assistantReply(qRaw) {
   if (has('investir', 'investimento', 'aplicar', 'render')) {
     const s = investmentSuggestions();
     if (!s.list.length) return 'Ainda não há caixa livre suficiente para investir. Vamos primeiro fechar mais alguns atendimentos! 💪';
-    return `Com base no seu caixa livre de <b>${fmt(s.fc)}</b>, sugiro:<ul>${s.list.map(x => `<li><b>${esc(x.title)}</b>: ${fmt(x.alloc)} — ${esc(x.ret)}</li>`).join('')}</ul>Veja os detalhes na aba <b>Patrimônio</b>.`;
+    return `Com base no seu caixa livre de <b>${fmt(s.fc)}</b>, sugiro:<ul>${s.list.map(x => `<li><b>${esc(x.title)}</b>: ${fmt(x.alloc)} — ${esc(x.ret)}</li>`).join('')}</ul>Na aba <b>Patrimônio</b> tem um <b>passo a passo</b> pra você investir com segurança (Tesouro Selic / CDB de liquidez diária) — é só clicar em "Comece a investir". 🌱`;
   }
   if (has('comprar', 'estoque', 'repor', 'acabando', 'falta', 'promo')) {
     const low = lowStock();
@@ -844,6 +876,14 @@ VIEWS.patrimonio = {
         <div class="section-head"><div><h2>🤖 Sugestões de investimento</h2><span class="sh-sub">Com base no seu caixa livre</span></div></div>
         ${inv.list.length ? inv.list.map(s => `<div class="insight tone-${s.tone}" style="margin-bottom:10px"><div class="ins-ico" style="background:${{ green: '#e2f8f1', amber: '#fef3df', violet: '#f3e8ff', blue: '#e6effd' }[s.tone]}">${s.ico}</div>
           <div style="flex:1"><div class="row between"><h4>${esc(s.title)}</h4><b style="font-family:var(--display);color:var(--violet)">${fmt(s.alloc)}</b></div><p>${esc(s.detail)}</p><span class="badge b-green" style="margin-top:6px">Retorno: ${esc(s.ret)}</span></div></div>`).join('') : `<div class="empty"><span class="e-ico">🌱</span>Fortaleça o caixa para liberar sugestões de investimento.</div>`}
+      </div>
+    </div>
+
+    <div class="card mt invest-card">
+      <div class="section-head"><div><h2>🌱 Comece a investir com segurança</h2><span class="sh-sub">Passo a passo simples pra fazer seu caixa livre render</span></div></div>
+      <div class="row between wrap" style="gap:14px;align-items:center">
+        <p style="flex:1;min-width:220px;margin:0;color:var(--ink-2)">Reserva de emergência primeiro, depois <b>Tesouro Selic</b> ou <b>CDB de liquidez diária</b> — seguros, rendem mais que a poupança e você saca quando quiser. Te mostro o caminho em 3 passos.</p>
+        <button class="btn btn-primary" data-act="como-investir">Ver o passo a passo →</button>
       </div>
     </div>
 
@@ -1947,6 +1987,7 @@ const ACTIONS = {
   'del-servico': (id) => { if (confirm('Excluir este serviço?')) { state.services = state.services.filter(s => s.id !== id); save(); render(); toast('Serviço removido.', 'info'); } },
   'new-item': modalItem,
   'new-asset': modalAsset,
+  'como-investir': modalComoInvestir,
   'gerar-pedido': modalListaCompras,
   'go-estoque': () => setView('estoque'),
   'go-patrimonio': () => setView('patrimonio'),
