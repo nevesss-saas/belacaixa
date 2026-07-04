@@ -468,6 +468,28 @@ textarea{resize:vertical;min-height:70px}
 .sg-item h4{margin:0 0 4px;font-size:15px}
 .sg-item p{margin:0;color:var(--ink-2);font-size:14px;line-height:1.5}
 .invest-why{background:#f3e8ff;border-radius:12px;padding:12px 14px;font-size:13.5px;color:var(--ink-2);line-height:1.5;margin:0 0 12px}
+/* banner de parceria (link de indicação) */
+.invest-partner-banner{display:flex;align-items:center;gap:11px;text-decoration:none;background:linear-gradient(135deg,#fff6e6,#ffeaf2);border:1px solid #ffd9a8;border-radius:14px;padding:11px 13px;margin:6px 0 12px;transition:.15s}
+.invest-partner-banner:hover{filter:brightness(.98);box-shadow:0 6px 16px -10px rgba(240,120,20,.5)}
+.ipb-star{font-size:20px}
+.ipb-txt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.ipb-txt b{color:var(--ink);font-size:14px}
+.ipb-txt small{color:var(--ink-3);font-size:11.5px}
+.ipb-go{flex:0 0 auto;font-weight:700;color:var(--rose);font-size:13.5px}
+/* scroll horizontal de bancos */
+.bank-scroll{display:flex;gap:9px;overflow-x:auto;padding:6px 2px 12px;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
+.bank-scroll::-webkit-scrollbar{height:6px}
+.bank-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+.bank-chip{flex:0 0 auto;width:92px;padding:12px 8px;border:1px solid var(--line);border-radius:14px;background:#fff;cursor:pointer;text-align:center;scroll-snap-align:start;transition:.15s}
+.bank-chip:hover{border-color:var(--rose)}
+.bank-chip.on{border-color:var(--violet);background:#faf5ff;box-shadow:0 6px 16px -11px rgba(155,93,229,.7)}
+.bk-ico{display:flex;align-items:center;justify-content:center;width:40px;height:40px;margin:0 auto;border-radius:11px;color:#fff;font-weight:800;font-size:14px;letter-spacing:.2px}
+.bk-name{display:block;margin-top:7px;font-size:12px;font-weight:600;color:var(--ink-2);line-height:1.2}
+.bank-steps{background:#f7fbff;border:1px solid #e3eefb;border-radius:12px;padding:12px 14px;margin-top:2px}
+.bank-steps h4{margin:0 0 8px;font-size:14.5px}
+.bank-steps ol{margin:0;padding-left:20px;display:grid;gap:7px}
+.bank-steps li{font-size:14px;color:var(--ink-2);line-height:1.45}
+.bank-tip{background:#eafaf4;border-radius:9px;padding:8px 11px;font-size:13px;color:var(--ink-2);margin:10px 0 0;line-height:1.45}
 
 /* ---- serviços ---- */
 .svc-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:16px}

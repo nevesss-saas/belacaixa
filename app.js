@@ -382,28 +382,101 @@ function investPartner() {
     return { name: p.partnerName || 'nosso parceiro', url: p.partnerUrl, bonus: p.partnerBonus || '' };
   } catch (_) { return null; }
 }
-// passo a passo educativo pra começar a investir (com CTA de parceria, se configurado)
+// bancos/corretoras com passo a passo próprio pra comprar Tesouro Selic / CDB de liquidez diária
+const INVEST_BANKS = [
+  { id: 'nubank', name: 'Nubank', color: '#820ad1', tag: 'Nu', steps: [
+      'Abra o app do <b>Nubank</b> e toque em <b>Investimentos</b> (ícone de gráfico).',
+      'Escolha <b>Tesouro Direto</b> → <b>Tesouro Selic</b> (o de vencimento mais próximo).',
+      'Digite o valor (a partir de ~R$ 30) e confirme com a sua senha.'],
+    tip: 'Pra guardar com resgate na hora também dá pra usar as <b>Caixinhas</b> rendendo 100% do CDI.' },
+  { id: 'inter', name: 'Inter', color: '#ff7a00', tag: 'in', steps: [
+      'No app do <b>Inter</b>, toque em <b>Investimentos</b>.',
+      'Vá em <b>Tesouro Direto</b> → <b>Tesouro Selic</b>.',
+      'Informe o valor e confirme.'],
+    tip: 'Na mesma tela de renda fixa aparecem <b>CDBs 100% do CDI com liquidez diária</b>.' },
+  { id: 'c6', name: 'C6 Bank', color: '#242424', tag: 'C6', steps: [
+      'No app do <b>C6</b>, abra <b>Investimentos</b>.',
+      'Toque em <b>Tesouro Direto</b> → <b>Tesouro Selic</b>.',
+      'Digite o valor e confirme.'],
+    tip: 'Veja também os <b>CDBs do C6</b> com liquidez diária.' },
+  { id: 'picpay', name: 'PicPay', color: '#11c76f', tag: 'Pp', steps: [
+      'No <b>PicPay</b>, toque em <b>Cofrinhos</b> (guarda rendendo 100% do CDI, saca quando quiser).',
+      'Ou entre em <b>Investimentos</b> pra ver CDBs e Tesouro.',
+      'Escolha, digite o valor e confirme.'],
+    tip: 'O <b>Cofrinho</b> é o jeito mais simples de começar: rende todo dia e resgata na hora.' },
+  { id: 'mercadopago', name: 'Mercado Pago', color: '#00b1ea', tag: 'MP', steps: [
+      'No app, toque em <b>Investimentos</b> ou <b>Fazer render</b>.',
+      'Ative o <b>rendimento da conta</b> (100% do CDI) ou escolha um <b>CDB</b>.',
+      'Confirme o valor.'],
+    tip: 'O próprio saldo da conta já pode render 100% do CDI com liquidez diária.' },
+  { id: 'itau', name: 'Itaú', color: '#ec7000', tag: 'It', steps: [
+      'No app <b>Itaú</b>, vá em <b>Investimentos</b>.',
+      'Escolha <b>Tesouro Direto</b> → <b>Tesouro Selic</b> (ou um <b>CDB</b> de liquidez diária).',
+      'Digite o valor e confirme.'],
+    tip: '' },
+  { id: 'bb', name: 'Banco do Brasil', color: '#f9d616', tagDark: true, tag: 'BB', steps: [
+      'No app <b>BB</b>, toque em <b>Investimentos</b>.',
+      'Vá em <b>Tesouro Direto</b> → <b>Tesouro Selic</b>.',
+      'Informe o valor e confirme.'],
+    tip: '' },
+  { id: 'bradesco', name: 'Bradesco', color: '#cc092f', tag: 'Br', steps: [
+      'No app <b>Bradesco</b>, abra <b>Investimentos</b>.',
+      'Escolha <b>Tesouro Direto</b> ou um <b>CDB</b> com liquidez diária.',
+      'Confirme o valor.'],
+    tip: '' },
+  { id: 'caixa', name: 'Caixa', color: '#0070af', tag: 'CX', steps: [
+      'No app <b>Caixa</b>, vá em <b>Investimentos</b>.',
+      'Escolha <b>Tesouro Direto</b> → <b>Tesouro Selic</b>.',
+      'Confirme o valor.'],
+    tip: '' },
+  { id: 'corretora', name: 'XP / Rico', color: '#0f0f0f', tag: 'XP', steps: [
+      'No app da corretora, abra <b>Renda Fixa</b> ou <b>Tesouro Direto</b>.',
+      'Selecione <b>Tesouro Selic</b> ou um <b>CDB 100% do CDI, liquidez diária</b>.',
+      'Digite o valor e confirme.'],
+    tip: 'Corretoras costumam ter a maior variedade de CDBs.' },
+];
+function bankChipsHTML() {
+  return INVEST_BANKS.map(b => `<button type="button" class="bank-chip" data-bank="${b.id}">
+    <span class="bk-ico" style="background:${b.color}${b.tagDark ? ';color:#222' : ''}">${b.tag}</span>
+    <span class="bk-name">${esc(b.name)}</span></button>`).join('');
+}
+function renderBankSteps(id) {
+  const b = INVEST_BANKS.find(x => x.id === id), el = $('#bankSteps');
+  if (!b || !el) return;
+  el.innerHTML = `<div class="bank-steps"><h4>📈 Passo a passo no ${esc(b.name)}</h4>
+    <ol>${b.steps.map(s => `<li>${s}</li>`).join('')}</ol>
+    ${b.tip ? `<p class="bank-tip">💡 ${b.tip}</p>` : ''}
+    <p class="muted" style="font-size:11.5px;margin:8px 2px 0">Os menus podem mudar de nome com atualizações do app — a ideia é sempre <b>Investimentos → Tesouro Selic / CDB de liquidez diária</b>.</p></div>`;
+}
+// passo a passo educativo por banco (+ CTA de parceria, se configurado no config.js)
 function modalComoInvestir() {
   const fc = freeCash(), bal = balance(), reserve = state.business.reserveTarget;
   const temReserva = bal >= reserve;
   const intro = temReserva
-    ? `Você tem <b>${fmt(fc)}</b> de caixa livre acima da sua reserva. Dá pra dar o primeiro passo com segurança 👇`
-    : `Você ainda está montando sua reserva de emergência (${fmt(Math.max(0, bal))} de ${fmt(reserve)}). O <b>passo 1</b> abaixo é justamente esse — depois dele, o resto.`;
+    ? `Você tem <b>${fmt(fc)}</b> de caixa livre acima da sua reserva. Dá pra começar com segurança 👇`
+    : `Dica: monte primeiro sua <b>reserva de emergência</b> (você tem ${fmt(Math.max(0, bal))} de ${fmt(reserve)}). Guarde-a no mesmo lugar seguro abaixo — depois invista o resto.`;
   const p = investPartner();
-  const passo2 = p
-    ? `<a class="btn btn-primary btn-block" href="${esc(p.url)}" target="_blank" rel="noopener nofollow sponsored" style="margin-top:8px">🏦 Abrir minha conta no ${esc(p.name)}</a>
-       <p class="muted" style="font-size:12px;margin:6px 2px 0">🔎 Este é um <b>link de indicação/parceria</b> — podemos ganhar uma comissão, <b>sem nenhum custo a mais pra você</b>.${p.bonus ? ' ' + esc(p.bonus) : ''}</p>`
-    : `<p class="muted" style="font-size:12.5px;margin:6px 2px 0">Ex.: Nubank, Inter, C6 ou XP — todas grátis e feitas pelo celular.</p>`;
+  const partnerBanner = p
+    ? `<a class="invest-partner-banner" href="${esc(p.url)}" target="_blank" rel="noopener nofollow sponsored">
+        <span class="ipb-star">⭐</span>
+        <span class="ipb-txt"><b>Recomendado — abrir conta no ${esc(p.name)}</b><small>Link de indicação · sem custo a mais pra você${p.bonus ? ' · ' + esc(p.bonus) : ''}</small></span>
+        <span class="ipb-go">Abrir →</span></a>`
+    : '';
   openModal('Comece a investir com segurança', `
     <p style="margin-top:0">${intro}</p>
-    <div class="step-guide">
-      <div class="sg-item"><span class="sg-n">1</span><div><h4>🛟 Primeiro, a reserva de emergência</h4><p>Guarde de 3 a 6 meses dos seus custos em algo que rende e você saca a qualquer hora (<b>Tesouro Selic</b> ou <b>CDB de liquidez diária</b>). É seu colchão pra imprevistos — só invista o resto depois dela.</p></div></div>
-      <div class="sg-item"><span class="sg-n">2</span><div><h4>🏦 Abra sua conta de investimentos</h4><p>Conta grátis, feita pelo celular em ~10 min (CPF + selfie). É por onde você compra o Tesouro e os CDBs.</p>${passo2}</div></div>
-      <div class="sg-item"><span class="sg-n">3</span><div><h4>📈 Faça o primeiro investimento seguro</h4><p>No app do banco, procure <b>"Tesouro Selic"</b> (ou <b>"CDB 100% do CDI, liquidez diária"</b>). Comece com pouco — R$ 30 já dá. Rende todo dia útil e você resgata quando quiser.</p></div></div>
-    </div>
-    <div class="invest-why"><b>Por que Tesouro Selic / CDB de liquidez diária?</b> São dos investimentos <b>mais seguros</b> do Brasil (o Tesouro é do governo; o CDB tem garantia do FGC até R$ 250 mil), rendem mais que a poupança e você pode sacar quando precisar.</div>
+    ${partnerBanner}
+    <label style="font-weight:700;display:block;margin:4px 2px 2px">🏦 Escolha o seu banco pra ver o passo a passo</label>
+    <div class="bank-scroll" id="bankScroll">${bankChipsHTML()}</div>
+    <div id="bankSteps"><p class="muted" style="font-size:13px;margin:4px 2px 0">👆 Toque no seu banco acima pra ver como investir nele.</p></div>
+    <div class="invest-why"><b>🛟 Comece pela reserva de emergência</b> (3–6 meses de custos), depois o resto. <b>Por que Tesouro Selic / CDB de liquidez diária?</b> São dos investimentos <b>mais seguros</b> do Brasil (o Tesouro é do governo; o CDB tem garantia do FGC até R$ 250 mil), rendem mais que a poupança e você saca quando precisar.</div>
     <p class="muted" style="font-size:11.5px;margin-bottom:0">⚠️ Conteúdo <b>educativo</b>, não é recomendação de investimento. Invista de acordo com o seu perfil e objetivos.</p>
   `, `<button class="btn btn-ghost" data-close>Fechar</button>`);
+  const scroll = $('#bankScroll');
+  if (scroll) scroll.querySelectorAll('[data-bank]').forEach(ch => ch.onclick = () => {
+    scroll.querySelectorAll('[data-bank]').forEach(x => x.classList.remove('on'));
+    ch.classList.add('on');
+    renderBankSteps(ch.dataset.bank);
+  });
 }
 
 function assistantReply(qRaw) {
