@@ -251,8 +251,8 @@ function seed() {
   ];
 
   const investments = [
-    { id: uid(), name: 'Tesouro Selic 2029', place: 'Tesouro Direto', value: 3200, updatedAt: isoInTZ(new Date(now.getFullYear(), now.getMonth() - 1, 12)) },
-    { id: uid(), name: 'CDB liquidez diária', place: 'Nubank', value: 1500, updatedAt: isoInTZ(new Date(now.getFullYear(), now.getMonth() - 1, 12)) },
+    { id: uid(), name: 'Tesouro Selic 2029', place: 'Tesouro Direto', value: 3200, rate: 10.5, updatedAt: isoInTZ(new Date(now.getFullYear(), now.getMonth() - 1, 12)) },
+    { id: uid(), name: 'CDB liquidez diária', place: 'Nubank', value: 1500, rate: 11, updatedAt: isoInTZ(new Date(now.getFullYear(), now.getMonth() - 1, 12)) },
   ];
 
   // histórico de patrimônio (6 meses)
@@ -295,6 +295,27 @@ const investTotal = () => (state.investments || []).reduce((a, x) => a + (+x.val
 const patrimonioTotal = () => assetsTotal() + investTotal() + Math.max(0, balance());
 /* investimento "vencido" = atualizado num mês anterior ao atual (nudge de atualização mensal) */
 function investStale(iso) { return String(iso || '').slice(0, 7) < todayISO().slice(0, 7); }
+/* Renda passiva estimada — cada investimento rende ~taxa% ao ano.
+   É PROJEÇÃO (faz o patrimônio crescer); só vira dinheiro no caixa quando o dono resgata. */
+const DEFAULT_INVEST_RATE = 10.5;   // ≈ Tesouro Selic / CDB 100% CDI
+function investRate(v) {
+  const r = (v && v.rate != null && isFinite(+v.rate)) ? +v.rate : DEFAULT_INVEST_RATE;
+  return Math.max(0, Math.min(200, r));
+}
+function investMonthly(v) { return (+v.value || 0) * investRate(v) / 100 / 12; }
+function investMonthlyTotal() { return (state.investments || []).reduce((a, v) => a + investMonthly(v), 0); }
+function investMonthsSince(iso) {
+  const p = String(iso || '').split('-'); if (p.length !== 3) return 0;
+  const t = todayISO().split('-');
+  const m = (+t[0] - +p[0]) * 12 + (+t[1] - +p[1]);
+  return m > 0 ? m : 0;
+}
+/* valor projetado hoje = valor conhecido rendendo a taxa desde a última atualização (juros compostos mensais) */
+function investProjected(v) {
+  const m = investMonthsSince(v && v.updatedAt);
+  const r = investRate(v) / 100 / 12;
+  return (+v.value || 0) * Math.pow(1 + r, m);
+}
 const freeCash = () => Math.max(0, balance() - state.business.reserveTarget);
 const lowStock = () => state.inventory.filter(i => i.qty <= i.min);
 const todaysAppts = () => state.appointments.filter(a => a.date === todayISO() && a.status === 'agendado').sort((a, b) => a.time.localeCompare(b.time));
@@ -975,13 +996,16 @@ VIEWS.patrimonio = {
         <button class="btn btn-outline btn-sm" data-act="new-invest">＋ Registrar investimento</button>
       </div>
       ${(state.investments && state.investments.length) ? `
+      <div class="insight tone-green" style="max-width:none;margin-bottom:12px"><div class="ins-ico" style="background:#e2f8f1">📈</div>
+        <div style="flex:1"><div class="row between" style="align-items:baseline"><h4>Renda passiva estimada</h4><b style="font-family:var(--display);color:#00b389">${fmt(investMonthlyTotal())}/mês</b></div>
+        <p>Seus investimentos rendem cerca de <b>${fmt(investMonthlyTotal())}/mês</b> (≈ ${fmt(investMonthlyTotal() * 12)}/ano) na taxa que você definiu — o valor cresce sozinho no patrimônio. Quando você <b>sacar</b> de verdade, toque em 💵 pra lançar a entrada no caixa.</p></div></div>
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Investimento</th><th>Onde / tipo</th><th>Atualizado</th><th class="num">Valor atual</th><th></th></tr></thead>
       <tbody>${state.investments.map(v => `<tr>
-        <td><b>${esc(v.name)}</b></td>
+        <td><b>${esc(v.name)}</b><br><span class="muted" style="font-size:12px">rende ≈ ${fmt(investMonthly(v))}/mês · ${investRate(v).toLocaleString('pt-BR')}% a.a.</span></td>
         <td>${v.place ? `<span class="tag-cat">${esc(v.place)}</span>` : '<span class="muted">—</span>'}</td>
         <td class="muted">${fmtDateFull(v.updatedAt)}${investStale(v.updatedAt) ? ' <span class="badge b-amber" title="Atualize o valor deste mês">atualize</span>' : ''}</td>
         <td class="num"><b>${fmt(+v.value || 0)}</b></td>
-        <td class="num" style="white-space:nowrap"><button class="btn btn-soft btn-sm" data-act="edit-invest" data-id="${v.id}" title="Atualizar valor">✏️ Atualizar</button> <button class="modal-x" data-act="del-invest" data-id="${v.id}" title="Remover">🗑️</button></td>
+        <td class="num" style="white-space:nowrap"><button class="modal-x" data-act="edit-invest" data-id="${v.id}" title="Atualizar valor">✏️</button> <button class="modal-x" data-act="resgatar-invest" data-id="${v.id}" title="Resgatar / receber rendimento no caixa">💵</button> <button class="modal-x" data-act="del-invest" data-id="${v.id}" title="Remover">🗑️</button></td>
       </tr>`).join('')}
       <tr><td colspan="3" class="num" style="font-weight:700">Total investido</td><td class="num" style="font-weight:800;color:var(--violet)">${fmt(investTotal())}</td><td></td></tr>
       </tbody></table></div>` : `<div class="empty"><span class="e-ico">🌱</span>Nenhum investimento registrado ainda. Toque em <b>Registrar investimento</b> pra lançar o valor que você já aplicou (Tesouro, CDB…) e atualize todo mês pra ver seu patrimônio crescer.</div>`}
@@ -1805,25 +1829,57 @@ function modalInvestimento(id) {
       <div class="field"><label>Valor atual (R$) <span class="muted" style="font-weight:400">— saldo de hoje</span></label><input class="input" id="iv_val" type="number" step="0.01" min="0" value="${v ? v.value : ''}"/></div>
       <div class="field"><label>Onde / tipo <span class="muted" style="font-weight:400">— opcional</span></label><input class="input" id="iv_place" placeholder="Ex.: Nubank, Tesouro Direto" value="${v && v.place ? esc(v.place) : ''}"/></div>
     </div>
+    <div class="field"><label>Rende ~ (% ao ano) <span class="muted" style="font-weight:400">— estimativa pra calcular quanto rende por mês</span></label>
+      <input class="input" id="iv_rate" type="number" step="0.1" min="0" max="200" value="${v ? investRate(v) : DEFAULT_INVEST_RATE}"/>
+      <div class="row" id="iv_rate_presets" style="gap:6px;flex-wrap:wrap;margin-top:6px">
+        <button type="button" class="btn btn-ghost btn-sm" data-rate="6">Poupança ~6%</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-rate="10.5">Tesouro/CDB ~10,5%</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-rate="13">CDB agressivo ~13%</button>
+      </div>
+    </div>
     ${editing
-      ? `<p class="muted" style="font-size:12.5px;margin:2px 2px 0">Valor anterior: <b>${fmt(+v.value || 0)}</b> · atualizado em ${fmtDateFull(v.updatedAt)}</p>`
+      ? `<p class="muted" style="font-size:12.5px;margin:2px 2px 0">Valor anterior: <b>${fmt(+v.value || 0)}</b> · atualizado em ${fmtDateFull(v.updatedAt)}</p>${investMonthsSince(v.updatedAt) >= 1 ? `<button type="button" class="btn btn-soft btn-sm" id="iv_useproj" style="margin-top:8px">📈 Usar projeção da taxa: ${fmt(investProjected(v))}</button>` : ''}`
       : `<label class="lunch-toggle" style="margin-top:4px"><input type="checkbox" id="iv_cash"/><span>💸 Esse dinheiro está saindo do meu caixa agora <span class="muted" style="font-weight:400">(lança uma saída no fluxo de caixa; desmarque se foi dinheiro de fora)</span></span></label>`}
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="iv_save">${editing ? 'Atualizar valor' : 'Registrar'}</button>`);
+  $('#iv_rate_presets').querySelectorAll('button[data-rate]').forEach(b => b.onclick = () => { $('#iv_rate').value = b.dataset.rate; });
+  const projBtn = $('#iv_useproj'); if (projBtn) projBtn.onclick = () => { $('#iv_val').value = investProjected(v).toFixed(2); };
   $('#iv_save').onclick = () => {
     const name = $('#iv_name').value.trim();
     const val = parseFloat($('#iv_val').value);
     const place = $('#iv_place').value.trim();
+    const rate = (() => { const r = parseFloat($('#iv_rate').value); return isFinite(r) && r >= 0 ? Math.min(200, r) : DEFAULT_INVEST_RATE; })();
     if (!name || !(val >= 0)) return toast('Preencha nome e valor.', 'warn');
     if (editing) {
-      v.name = name; v.value = +val.toFixed(2); v.place = place; v.updatedAt = todayISO();
+      v.name = name; v.value = +val.toFixed(2); v.place = place; v.rate = rate; v.updatedAt = todayISO();
     } else {
-      state.investments.push({ id: uid(), name, place, value: +val.toFixed(2), updatedAt: todayISO() });
+      state.investments.push({ id: uid(), name, place, value: +val.toFixed(2), rate, updatedAt: todayISO() });
       if ($('#iv_cash') && $('#iv_cash').checked && val > 0) {
         state.transactions.push({ id: uid(), type: 'out', category: 'Investimento', amount: +val.toFixed(2), desc: 'Aporte — ' + name, date: todayISO() });
       }
     }
     save(); closeModal(); render();
     toast(editing ? 'Valor atualizado 📈' : 'Investimento registrado no patrimônio 🏛️', 'ok');
+  };
+}
+/* Resgatar/receber rendimento: tira do investimento e ENTRA no caixa (só quando o dinheiro cai na conta). */
+function modalResgatar(id) {
+  const v = (state.investments || []).find(x => x.id === id); if (!v) return;
+  const val = +v.value || 0;
+  const sugYield = Math.min(val, Math.round((investProjected(v) - val) * 100) / 100);   // rendimento acumulado desde a última atualização
+  const sug = sugYield > 0 ? sugYield : Math.round(investMonthly(v) * 100) / 100;         // senão, o rendimento de ~1 mês
+  openModal('💵 Resgatar / receber rendimento', `
+    <p class="muted" style="margin:0 0 12px"><b>${esc(v.name)}</b> — valor atual <b>${fmt(val)}</b> · rende ≈ ${fmt(investMonthly(v))}/mês</p>
+    <div class="field"><label>Quanto caiu na sua conta (R$) <span class="muted" style="font-weight:400">— o que você sacou</span></label><input class="input" id="rg_val" type="number" step="0.01" min="0" max="${val}" value="${sug > 0 ? sug : ''}"/></div>
+    <div class="insight tone-blue" style="max-width:none"><div class="ins-ico" style="background:#e6effd">ℹ️</div><div><p style="margin:0">Isso <b>lança uma entrada no seu caixa</b> e reduz o valor investido no mesmo tanto. Use só quando o dinheiro <b>cair de verdade</b> na sua conta.</p></div></div>
+  `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="rg_save">Resgatar e lançar no caixa</button>`);
+  $('#rg_save').onclick = () => {
+    let amt = parseFloat($('#rg_val').value);
+    if (!(amt > 0)) return toast('Informe o valor sacado.', 'warn');
+    amt = Math.min(amt, val);                          // não pode sacar mais do que tem
+    v.value = +(val - amt).toFixed(2); v.updatedAt = todayISO();
+    state.transactions.push({ id: uid(), type: 'in', category: 'Rendimento de investimento', amount: +amt.toFixed(2), desc: 'Resgate — ' + v.name, date: todayISO() });
+    save(); closeModal(); render();
+    toast(fmt(amt) + ' resgatado e lançado no caixa 💵', 'ok');
   };
 }
 function modalRepor(id) {
@@ -2174,6 +2230,7 @@ const ACTIONS = {
   'new-asset': modalAsset,
   'new-invest': () => modalInvestimento(),
   'edit-invest': (id) => modalInvestimento(id),
+  'resgatar-invest': (id) => modalResgatar(id),
   'del-invest': (id) => { if (confirm('Remover este investimento do patrimônio?')) { state.investments = (state.investments || []).filter(v => v.id !== id); save(); render(); toast('Investimento removido.', 'info'); } },
   'como-investir': modalComoInvestir,
   'gerar-pedido': modalListaCompras,
