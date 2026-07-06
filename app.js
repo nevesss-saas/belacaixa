@@ -164,7 +164,7 @@ function unsubscribeTenantRealtime() {
 // estado inicial de uma conta nova: modelos prontos, dados operacionais zerados
 function starterState() {
   const s = seed();
-  s.clients = []; s.transactions = []; s.appointments = []; s.assets = []; s.chat = [];
+  s.clients = []; s.transactions = []; s.appointments = []; s.assets = []; s.investments = []; s.chat = [];
   s.business.name = 'Meu Negócio';
   return s;
 }
@@ -250,6 +250,11 @@ function seed() {
     { id: uid(), name: 'Cabine UV/LED + acessórios', category: 'Equipamento', value: 650, acquiredAt: '2025-04-20' },
   ];
 
+  const investments = [
+    { id: uid(), name: 'Tesouro Selic 2029', place: 'Tesouro Direto', value: 3200, updatedAt: isoInTZ(new Date(now.getFullYear(), now.getMonth() - 1, 12)) },
+    { id: uid(), name: 'CDB liquidez diária', place: 'Nubank', value: 1500, updatedAt: isoInTZ(new Date(now.getFullYear(), now.getMonth() - 1, 12)) },
+  ];
+
   // histórico de patrimônio (6 meses)
   const patHist = [];
   for (let m = 5; m >= 0; m--) {
@@ -261,7 +266,7 @@ function seed() {
     v: 1,
     business: { name: 'Nails e Pedicure', timezone: DEFAULT_TZ, reserveTarget: 5000, monthlyGoal: 8000, hours: { open: '09:00', close: '19:00', days: [1, 2, 3, 4, 5, 6], slot: 30 } },
     security: { pinHash: '' },
-    clients, services, inventory: inv, transactions: tx, appointments: appts, assets,
+    clients, services, inventory: inv, transactions: tx, appointments: appts, assets, investments,
     patHist, chat: []
   };
 }
@@ -286,7 +291,10 @@ function last6Months() {
   return arr;
 }
 const assetsTotal = () => state.assets.reduce((a, x) => a + x.value, 0);
-const patrimonioTotal = () => assetsTotal() + Math.max(0, balance());
+const investTotal = () => (state.investments || []).reduce((a, x) => a + (+x.value || 0), 0);
+const patrimonioTotal = () => assetsTotal() + investTotal() + Math.max(0, balance());
+/* investimento "vencido" = atualizado num mês anterior ao atual (nudge de atualização mensal) */
+function investStale(iso) { return String(iso || '').slice(0, 7) < todayISO().slice(0, 7); }
 const freeCash = () => Math.max(0, balance() - state.business.reserveTarget);
 const lowStock = () => state.inventory.filter(i => i.qty <= i.min);
 const todaysAppts = () => state.appointments.filter(a => a.date === todayISO() && a.status === 'agendado').sort((a, b) => a.time.localeCompare(b.time));
@@ -939,15 +947,15 @@ VIEWS.patrimonio = {
     return `
     <div class="grid cols-4">
       ${kpi('🏛️', 'Patrimônio total', fmt(patrimonioTotal()), `<span class="kpi-delta ${growth >= 0 ? 'delta-up' : 'delta-down'}">${growth >= 0 ? '▲' : '▼'} ${Math.abs(growth)}% em 6m</span>`, 'linear-gradient(135deg,#f43f8e,#9b5de5)')}
+      ${kpi('📈', 'Investimentos', fmt(investTotal()), '', '#e6effd', '#3b82f6')}
       ${kpi('🪑', 'Bens & equipamentos', fmt(assetsTotal()), '', '#f3e8ff', '#9b5de5')}
       ${kpi('💵', 'Em caixa', fmt(Math.max(0, balance())), '', '#e2f8f1', '#00b389')}
-      ${kpi('🚀', 'Caixa livre p/ investir', fmt(inv.fc), '', '#e6effd', '#3b82f6')}
     </div>
 
     <div class="grid cols-2 mt">
       <div class="card"><div class="section-head"><div><h2>Evolução do patrimônio</h2><span class="sh-sub">Caixa + bens nos últimos 6 meses</span></div></div>${svgLine(series)}</div>
       <div class="card">
-        <div class="section-head"><div><h2>🤖 Sugestões de investimento</h2><span class="sh-sub">Com base no seu caixa livre</span></div></div>
+        <div class="section-head"><div><h2>🤖 Sugestões de investimento</h2><span class="sh-sub">Com base no seu caixa livre de ${fmt(inv.fc)}</span></div></div>
         ${inv.list.length ? inv.list.map(s => `<div class="insight tone-${s.tone}" style="margin-bottom:10px"><div class="ins-ico" style="background:${{ green: '#e2f8f1', amber: '#fef3df', violet: '#f3e8ff', blue: '#e6effd' }[s.tone]}">${s.ico}</div>
           <div style="flex:1"><div class="row between"><h4>${esc(s.title)}</h4><b style="font-family:var(--display);color:var(--violet)">${fmt(s.alloc)}</b></div><p>${esc(s.detail)}</p><span class="badge b-green" style="margin-top:6px">Retorno: ${esc(s.ret)}</span></div></div>`).join('') : `<div class="empty"><span class="e-ico">🌱</span>Fortaleça o caixa para liberar sugestões de investimento.</div>`}
       </div>
@@ -959,6 +967,24 @@ VIEWS.patrimonio = {
         <p style="flex:1;min-width:220px;margin:0;color:var(--ink-2)">Reserva de emergência primeiro, depois <b>Tesouro Selic</b> ou <b>CDB de liquidez diária</b> — seguros, rendem mais que a poupança e você saca quando quiser. Te mostro o caminho em 3 passos.</p>
         <button class="btn btn-primary" data-act="como-investir">Ver o passo a passo →</button>
       </div>
+    </div>
+
+    <div class="card mt">
+      <div class="section-head">
+        <div><h2>📈 Meus investimentos</h2><span class="sh-sub">Registre quanto você já aplicou e atualize o valor todo mês</span></div>
+        <button class="btn btn-outline btn-sm" data-act="new-invest">＋ Registrar investimento</button>
+      </div>
+      ${(state.investments && state.investments.length) ? `
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Investimento</th><th>Onde / tipo</th><th>Atualizado</th><th class="num">Valor atual</th><th></th></tr></thead>
+      <tbody>${state.investments.map(v => `<tr>
+        <td><b>${esc(v.name)}</b></td>
+        <td>${v.place ? `<span class="tag-cat">${esc(v.place)}</span>` : '<span class="muted">—</span>'}</td>
+        <td class="muted">${fmtDateFull(v.updatedAt)}${investStale(v.updatedAt) ? ' <span class="badge b-amber" title="Atualize o valor deste mês">atualize</span>' : ''}</td>
+        <td class="num"><b>${fmt(+v.value || 0)}</b></td>
+        <td class="num" style="white-space:nowrap"><button class="btn btn-soft btn-sm" data-act="edit-invest" data-id="${v.id}" title="Atualizar valor">✏️ Atualizar</button> <button class="modal-x" data-act="del-invest" data-id="${v.id}" title="Remover">🗑️</button></td>
+      </tr>`).join('')}
+      <tr><td colspan="3" class="num" style="font-weight:700">Total investido</td><td class="num" style="font-weight:800;color:var(--violet)">${fmt(investTotal())}</td><td></td></tr>
+      </tbody></table></div>` : `<div class="empty"><span class="e-ico">🌱</span>Nenhum investimento registrado ainda. Toque em <b>Registrar investimento</b> pra lançar o valor que você já aplicou (Tesouro, CDB…) e atualize todo mês pra ver seu patrimônio crescer.</div>`}
     </div>
 
     <div class="card mt">
@@ -1766,6 +1792,40 @@ function modalAsset() {
     save(); closeModal(); render(); toast('Bem adicionado ao patrimônio 🏛️', 'ok');
   };
 }
+/* Registrar (novo aporte) ou ATUALIZAR o valor atual (todo mês) de um investimento.
+   Novo: opção de lançar a saída no caixa. Atualizar: só muda o valor + carimba a data. */
+function modalInvestimento(id) {
+  if (!state.investments) state.investments = [];
+  const v = id ? state.investments.find(x => x.id === id) : null;
+  const editing = !!v;
+  openModal(editing ? '📈 Atualizar investimento' : '📈 Registrar investimento', `
+    ${editing ? '' : '<p class="muted" style="margin:0 0 12px">Lance um valor que você já aplicou (Tesouro Selic, CDB, poupança…). Depois é só voltar aqui todo mês e atualizar o <b>valor atual</b> pra acompanhar o crescimento do seu patrimônio.</p>'}
+    <div class="field"><label>Nome do investimento</label><input class="input" id="iv_name" placeholder="Ex.: Tesouro Selic 2029" value="${v ? esc(v.name) : ''}"/></div>
+    <div class="field-row">
+      <div class="field"><label>Valor atual (R$) <span class="muted" style="font-weight:400">— saldo de hoje</span></label><input class="input" id="iv_val" type="number" step="0.01" min="0" value="${v ? v.value : ''}"/></div>
+      <div class="field"><label>Onde / tipo <span class="muted" style="font-weight:400">— opcional</span></label><input class="input" id="iv_place" placeholder="Ex.: Nubank, Tesouro Direto" value="${v && v.place ? esc(v.place) : ''}"/></div>
+    </div>
+    ${editing
+      ? `<p class="muted" style="font-size:12.5px;margin:2px 2px 0">Valor anterior: <b>${fmt(+v.value || 0)}</b> · atualizado em ${fmtDateFull(v.updatedAt)}</p>`
+      : `<label class="lunch-toggle" style="margin-top:4px"><input type="checkbox" id="iv_cash"/><span>💸 Esse dinheiro está saindo do meu caixa agora <span class="muted" style="font-weight:400">(lança uma saída no fluxo de caixa; desmarque se foi dinheiro de fora)</span></span></label>`}
+  `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="iv_save">${editing ? 'Atualizar valor' : 'Registrar'}</button>`);
+  $('#iv_save').onclick = () => {
+    const name = $('#iv_name').value.trim();
+    const val = parseFloat($('#iv_val').value);
+    const place = $('#iv_place').value.trim();
+    if (!name || !(val >= 0)) return toast('Preencha nome e valor.', 'warn');
+    if (editing) {
+      v.name = name; v.value = +val.toFixed(2); v.place = place; v.updatedAt = todayISO();
+    } else {
+      state.investments.push({ id: uid(), name, place, value: +val.toFixed(2), updatedAt: todayISO() });
+      if ($('#iv_cash') && $('#iv_cash').checked && val > 0) {
+        state.transactions.push({ id: uid(), type: 'out', category: 'Investimento', amount: +val.toFixed(2), desc: 'Aporte — ' + name, date: todayISO() });
+      }
+    }
+    save(); closeModal(); render();
+    toast(editing ? 'Valor atualizado 📈' : 'Investimento registrado no patrimônio 🏛️', 'ok');
+  };
+}
 function modalRepor(id) {
   const it = state.inventory.find(i => i.id === id); if (!it) return;
   const price = it.cost;
@@ -2112,6 +2172,9 @@ const ACTIONS = {
   'del-servico': (id) => { if (confirm('Excluir este serviço?')) { state.services = state.services.filter(s => s.id !== id); save(); render(); toast('Serviço removido.', 'info'); } },
   'new-item': modalItem,
   'new-asset': modalAsset,
+  'new-invest': () => modalInvestimento(),
+  'edit-invest': (id) => modalInvestimento(id),
+  'del-invest': (id) => { if (confirm('Remover este investimento do patrimônio?')) { state.investments = (state.investments || []).filter(v => v.id !== id); save(); render(); toast('Investimento removido.', 'info'); } },
   'como-investir': modalComoInvestir,
   'gerar-pedido': modalListaCompras,
   'go-estoque': () => setView('estoque'),
