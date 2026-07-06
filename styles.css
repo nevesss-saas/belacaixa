@@ -65,10 +65,10 @@ h1,h2,h3,h4{font-family:var(--display);line-height:1.15}
 .logo-text{font-family:var(--display);font-weight:600;font-size:19px}
 .logo-text b{font-weight:800}
 /* logos em imagem (marca do BelaCaixa) */
-.brand-wide{height:40px;width:auto;display:block;max-width:100%}
-.brand-stack{height:52px;width:auto;display:block;max-width:100%;border-radius:8px}
-.auth-brand .brand-wide{height:56px}
-.lp-footer .brand-stack{height:46px}
+.brand-wide{height:52px;width:auto;display:block;max-width:100%}
+.brand-stack{height:62px;width:auto;display:block;max-width:100%}
+.auth-brand .brand-wide{height:80px}
+.lp-footer .brand-stack{height:56px}
 .lp-links{display:flex;gap:26px;margin-left:auto;font-weight:500;color:var(--ink-2)}
 .lp-links a:hover{color:var(--rose)}
 .lp-nav .btn-primary{margin-left:8px}
