@@ -258,12 +258,22 @@
         var svc = pickedSvc();
         var dur = svc ? (svc[2]||60) : 60;
         var open = hhmmToMin(oh.open), close = hhmmToMin(oh.close), step = oh.slot||30;
+        // horário de almoço/pausa do salão — some da lista (ninguém consegue marcar nele)
+        var lunch = (oh.lunch && oh.lunch.on && oh.lunch.start && oh.lunch.end && hhmmToMin(oh.lunch.end) > hhmmToMin(oh.lunch.start)) ? oh.lunch : null;
+        var lunchHit = null;
+        if(lunch){
+          var lqs = String(date).split('-'); var lwd = new Date(+lqs[0], +lqs[1]-1, +lqs[2]).getDay();
+          var ldays = (Array.isArray(lunch.days) && lunch.days.length) ? lunch.days.map(Number) : oh.days;
+          if(ldays.indexOf(lwd) >= 0) lunchHit = { s: hhmmToMin(lunch.start), e: hhmmToMin(lunch.end) };
+        }
         var nowMin = -1;
         if(date === iso){ var n = new Date(); nowMin = n.getHours()*60 + n.getMinutes(); }
         var out = [];
         for(var t = open; t + dur <= close; t += step){
           if(t <= nowMin) continue;
-          var te = t + dur, taken = false;
+          var te = t + dur;
+          if(lunchHit && t < lunchHit.e && lunchHit.s < te) continue;   // encosta no almoço → fora
+          var taken = false;
           if(busyDate === date){ taken = busySlots.some(function(b){ var bs=hhmmToMin(b[0]), be=bs+(b[1]||60); return t < be && bs < te; }); }
           if(!taken) out.push(t);
         }
@@ -328,6 +338,8 @@
             openWa(svc, date, time, name, phone, note);
           } else if(res && (res.reason === 'conflict' || res.reason === 'busy_retry')){
             alert('Ihh, esse horário acabou de ser reservado por outra pessoa 😅\nEscolha outro, por favor 💜'); loadBusy(date);
+          } else if(res && res.reason === 'lunch'){
+            alert('Esse horário é a pausa/almoço do salão 🍽️\nEscolha outro, por favor 💜'); loadBusy(date);
           } else if(res && (res.reason === 'hours' || res.reason === 'day')){
             alert('Esse horário está fora do expediente do salão 🕗\nEscolha outro, por favor.'); loadBusy(date);
           } else {

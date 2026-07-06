@@ -882,6 +882,7 @@ function suggestSlot() {
     const taken = state.appointments.filter(a => a.date === iso && a.status === 'agendado').map(a => hhmmToMin(a.time));
     for (let t = open; t + 60 <= close; t += step) {
       if (taken.includes(t) || t <= nowM) continue;
+      if (inLunch(iso, t, 60)) continue;                                // pula o horário de almoço
       const s = minToHHMM(t);
       return { iso, time: s, label: (off === 0 ? 'Hoje ' : dayName(iso) + ' ') + s, full: (off === 0 ? 'hoje' : dayName(iso) + ' (' + fmtDate(iso) + ')') + ' às ' + s };
     }
@@ -1589,6 +1590,26 @@ function bizHours() {
     slot: +h.slot || 30
   };
 }
+/* Horário de almoço/intervalo — bloqueado na agenda e no link (não vira horário vago).
+   days vazio = vale em TODOS os dias de expediente ("toda semana"); com dias = só neles. */
+function bizLunch() {
+  const l = (state.business && state.business.hours && state.business.hours.lunch) || null;
+  if (!l || !l.on) return null;
+  const start = l.start || '', end = l.end || '';
+  if (!start || !end || hhmmToMin(end) <= hhmmToMin(start)) return null;   // faixa inválida = ignora
+  return { start, end, days: Array.isArray(l.days) ? l.days.map(Number) : [] };
+}
+/* true se o atendimento [time, time+dur) encosta na faixa de almoço daquele dia. */
+function inLunch(dateISO, timeMin, durMin) {
+  const l = bizLunch(); if (!l) return false;
+  const p = String(dateISO || '').split('-'); if (p.length !== 3) return false;
+  const wd = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
+  const days = l.days.length ? l.days : bizHours().days;   // vazio = todos os dias de expediente
+  if (!days.includes(wd)) return false;
+  const ls = hhmmToMin(l.start), le = hhmmToMin(l.end);
+  const te = timeMin + (+durMin || 60);
+  return timeMin < le && ls < te;   // sobreposição da faixa do atendimento com o almoço
+}
 function isOpenDay(dateISO) {
   const p = String(dateISO || '').split('-'); if (p.length !== 3) return true;
   const d = new Date(+p[0], +p[1] - 1, +p[2]);
@@ -1602,6 +1623,7 @@ function withinHours(dateISO, time, dur) {
   const s = hhmmToMin(time), e = s + (+dur || 60);
   if (s < hhmmToMin(h.open)) return { ok: false, reason: 'before' };
   if (e > hhmmToMin(h.close)) return { ok: false, reason: 'after' };
+  if (inLunch(dateISO, s, +dur || 60)) return { ok: false, reason: 'lunch' };
   return { ok: true };
 }
 /* Reservas feitas pelo link que ficaram penduradas (você não aceitou nem recusou)
@@ -1645,8 +1667,11 @@ function modalAgenda(pre) {
     const wh = withinHours(date, time, dur);
     if (!wh.ok) {
       const hh = bizHours();
+      const lz = bizLunch();
       const msg = wh.reason === 'day'
         ? '⚠️ ' + dayName(date) + ' não é dia de atendimento (' + ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].filter((_, i) => hh.days.includes(i)).join(', ') + ').'
+        : wh.reason === 'lunch'
+        ? '🍽️ ' + time + ' cai no seu horário de almoço' + (lz ? ' (' + lz.start + '–' + lz.end + ')' : '') + ' — esse horário não aparece pras clientes.'
         : '⚠️ ' + time + ' está fora do expediente (' + hh.open + '–' + hh.close + ')' + (wh.reason === 'after' ? ' — o serviço terminaria depois do fechamento.' : '.');
       if (!confirm(msg + '\n\nAgendar assim mesmo?')) return;
     }
@@ -1994,6 +2019,10 @@ function modalBiz() {
   const h = bizHours();
   const tz = b.timezone || DEFAULT_TZ;
   const diasLbl = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const lun = ((b.hours || {}).lunch && typeof (b.hours).lunch === 'object') ? b.hours.lunch : {};
+  const lunOn = !!lun.on, lunStart = lun.start || '12:00', lunEnd = lun.end || '13:00';
+  const lunDays = Array.isArray(lun.days) ? lun.days.map(Number) : [];
+  const lunScope = lunDays.length ? 'some' : 'all';
   const tzOpts = [
     ['America/Sao_Paulo', 'Brasília (UTC−3) — SP, RJ, MG, Sul, Nordeste, DF'],
     ['America/Manaus', 'Amazônia (UTC−4) — AM, RO, RR, MT, MS'],
@@ -2017,6 +2046,21 @@ function modalBiz() {
         ${diasLbl.map((d, i) => `<button type="button" class="btn btn-sm ${h.days.includes(i) ? 'btn-primary' : 'btn-ghost'}" data-d="${i}">${d}</button>`).join('')}
       </div>
     </div>
+    <div class="field"><label>🍽️ Horário de almoço / pausa <span class="muted" style="font-weight:400">(esse horário some da agenda — ninguém consegue marcar nele)</span></label>
+      <label class="lunch-toggle"><input type="checkbox" id="g_lunch_on"${lunOn ? ' checked' : ''}/><span>Tenho um horário de almoço/pausa fixo</span></label>
+      <div id="g_lunch_box"${lunOn ? '' : ' style="display:none"'}>
+        <div class="field-row">
+          <div class="field"><label class="muted" style="font-weight:500;font-size:13px">Começa às</label><input class="input" id="g_lunch_start" type="time" value="${lunStart}"/></div>
+          <div class="field"><label class="muted" style="font-weight:500;font-size:13px">Volta às</label><input class="input" id="g_lunch_end" type="time" value="${lunEnd}"/></div>
+          <div class="field"><label class="muted" style="font-weight:500;font-size:13px">Vale em</label>
+            <select class="input" id="g_lunch_scope"><option value="all"${lunScope === 'all' ? ' selected' : ''}>Todos os dias (toda semana)</option><option value="some"${lunScope === 'some' ? ' selected' : ''}>Só em dias específicos</option></select>
+          </div>
+        </div>
+        <div class="row" id="g_lunch_days" style="gap:6px;flex-wrap:wrap;margin-top:4px;${lunScope === 'some' ? '' : 'display:none'}">
+          ${diasLbl.map((d, i) => `<button type="button" class="btn btn-sm ${lunDays.includes(i) ? 'btn-primary' : 'btn-ghost'}" data-d="${i}">${d}</button>`).join('')}
+        </div>
+      </div>
+    </div>
     <div class="field-row"><div class="field"><label>Reserva de emergência alvo (R$)</label><input class="input" id="g_res" type="number" value="${b.reserveTarget}"/></div><div class="field"><label>Meta de faturamento mensal (R$)</label><input class="input" id="g_goal" type="number" value="${b.monthlyGoal}"/></div></div>
     ${pinSectionHTML()}
     <hr style="border:none;border-top:1px solid var(--line);margin:8px 0 14px">
@@ -2024,6 +2068,11 @@ function modalBiz() {
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="g_save">Salvar</button>`);
   bindPinSection();
   $('#g_days').querySelectorAll('button[data-d]').forEach(btn => btn.onclick = () => { btn.classList.toggle('btn-primary'); btn.classList.toggle('btn-ghost'); });
+  // almoço: liga/desliga a caixa, alterna "dias específicos", e chips clicáveis
+  const lunchBox = $('#g_lunch_box'), lunchDaysRow = $('#g_lunch_days'), lunchScope = $('#g_lunch_scope');
+  $('#g_lunch_on').onchange = e => { lunchBox.style.display = e.target.checked ? '' : 'none'; };
+  lunchScope.onchange = () => { lunchDaysRow.style.display = lunchScope.value === 'some' ? '' : 'none'; };
+  lunchDaysRow.querySelectorAll('button[data-d]').forEach(btn => btn.onclick = () => { btn.classList.toggle('btn-primary'); btn.classList.toggle('btn-ghost'); });
   // relógio ao vivo do fuso escolhido (atualiza no dropdown e a cada 20s)
   const tzNow = () => {
     const sel = $('#g_tz').value;
@@ -2039,7 +2088,10 @@ function modalBiz() {
     b.whatsapp = waPhone($('#g_wa').value);
     b.timezone = $('#g_tz').value || DEFAULT_TZ;
     const days = [...$('#g_days').querySelectorAll('button[data-d]')].filter(x => x.classList.contains('btn-primary')).map(x => +x.dataset.d);
-    b.hours = { open: $('#g_open').value || '09:00', close: $('#g_close').value || '19:00', days: days.length ? days : [1, 2, 3, 4, 5, 6], slot: +$('#g_slot').value || 30 };
+    const lunchOn = $('#g_lunch_on').checked;
+    const lScope = $('#g_lunch_scope').value;
+    const lDays = lScope === 'some' ? [...$('#g_lunch_days').querySelectorAll('button[data-d]')].filter(x => x.classList.contains('btn-primary')).map(x => +x.dataset.d) : [];
+    b.hours = { open: $('#g_open').value || '09:00', close: $('#g_close').value || '19:00', days: days.length ? days : [1, 2, 3, 4, 5, 6], slot: +$('#g_slot').value || 30, lunch: { on: lunchOn, start: $('#g_lunch_start').value || '12:00', end: $('#g_lunch_end').value || '13:00', days: lDays } };
     save(); closeModal(); render(); toast('Configurações salvas.', 'ok');
   };
   $('#g_reset').onclick = () => { if (confirm('Isso substitui seus dados pelos de demonstração. Continuar?')) { state = seed(); save(); closeModal(); render(); toast('Dados de demonstração carregados.', 'info'); } };
