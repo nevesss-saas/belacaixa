@@ -161,6 +161,7 @@ h1,h2,h3,h4{font-family:var(--display);line-height:1.15}
 .content{display:flex;flex-direction:column;min-width:0}
 .topbar{display:flex;align-items:center;gap:16px;padding:18px 28px;background:rgba(255,255,255,.7);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
 .hamburger{display:none;font-size:22px;color:var(--ink)}
+.tb-logo{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);height:42px;width:auto;pointer-events:none;user-select:none}
 .tb-title h1{font-size:22px}
 .tb-title p{font-size:13.5px;color:var(--ink-3)}
 .tb-right{margin-left:auto;display:flex;align-items:center;gap:14px}
@@ -546,6 +547,7 @@ textarea{resize:vertical;min-height:70px}
   .sidebar{position:fixed;left:0;top:0;z-index:60;transform:translateX(-100%);transition:.25s;width:264px}
   .sidebar.open{transform:none;box-shadow:0 0 0 100vmax rgba(0,0,0,.4)}
   .hamburger{display:block}
+  .tb-logo{display:none}
   .cols-2,.cols-3,.cols-4,.feature-grid,.steps,.plans{grid-template-columns:1fr}
   .feature-grid,.steps,.plans{}
   .field-row{grid-template-columns:1fr}
