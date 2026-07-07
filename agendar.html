@@ -78,7 +78,7 @@
       <div id="errView" class="err-box hidden">
         <div class="em">🌸</div>
         <h2>Link indisponível</h2>
-        <p>Esse link de agendamento parece inválido ou expirou. Peça um novo pro salão. 💜</p>
+        <p>Esse link de agendamento parece inválido ou expirou. Peça um novo <span data-term-fem="pro salão" data-term-masc="pra barbearia">pro salão</span>. 💜</p>
       </div>
 
       <!-- carregando (link curto busca os dados) -->
@@ -120,8 +120,8 @@
           <textarea class="input" id="fNote" placeholder="(opcional) ex.: alergia, referência, preferência de cor…"></textarea>
 
           <button class="go" id="goBtn">✅ Reservar meu horário</button>
-          <p class="fallback" id="fallback">Não abriu o WhatsApp? <a id="fallbackLink" href="#" target="_blank" rel="noopener">Toque aqui pra avisar o salão</a></p>
-          <p class="note" id="bookNote">Seu horário fica <b>reservado na hora</b> 🔒 — o salão confirma com você pelo WhatsApp. 😊</p>
+          <p class="fallback" id="fallback">Não abriu o WhatsApp? <a id="fallbackLink" href="#" target="_blank" rel="noopener">Toque aqui pra avisar <span data-term-fem="o salão" data-term-masc="a barbearia">o salão</span></a></p>
+          <p class="note" id="bookNote">Seu horário fica <b>reservado na hora</b> 🔒 — <span data-term-fem="o salão" data-term-masc="a barbearia">o salão</span> confirma com você pelo WhatsApp. 😊</p>
         </div>
       </div>
     </div>
@@ -148,6 +148,13 @@
         while(b64.length % 4) b64 += '=';
         return JSON.parse(decodeURIComponent(escape(atob(b64))));
       }catch(e){ return null; }
+    }
+    // termo do negócio conforme o tema: "salão" (rosa) / "barbearia" (azul).
+    function sal(fem, masc){ return document.documentElement.getAttribute('data-theme') === 'masc' ? masc : fem; }
+    function applyAgTerms(){
+      var masc = document.documentElement.getAttribute('data-theme') === 'masc';
+      var els = document.querySelectorAll('[data-term-fem][data-term-masc]');
+      for(var i=0;i<els.length;i++){ els[i].textContent = masc ? els[i].getAttribute('data-term-masc') : els[i].getAttribute('data-term-fem'); }
     }
     function brDate(iso){
       if(!iso) return '';
@@ -184,8 +191,11 @@
       formView.classList.remove('hidden');
       // tema visual do salão (rosa padrão / azul "masc") — combina com o painel do dono
       document.documentElement.setAttribute('data-theme', (data.theme || data.t) === 'masc' ? 'masc' : 'fem');
-      var biz = data.b || 'Salão';
+      applyAgTerms();                                  // troca "salão"↔"barbearia" nos textos fixos
+      var biz = data.b || sal('Salão', 'Barbearia');
       var wa = data.w;
+      var fNameEl = document.getElementById('fName');
+      if(fNameEl) fNameEl.placeholder = 'Como ' + sal('o salão', 'a barbearia') + ' vai te chamar';
       document.getElementById('bizName').textContent = biz;
       document.title = 'Agende na ' + biz + ' 📅';
 
@@ -197,7 +207,7 @@
       var AUTO = !data || data.auto !== 0;
       if(!AUTO){
         var bn = document.getElementById('bookNote');
-        if(bn) bn.innerHTML = 'Seu pedido vai direto pro <b>WhatsApp do salão</b> 💬 — ele confirma o horário com você. 😊';
+        if(bn) bn.innerHTML = 'Seu pedido vai direto pro <b>WhatsApp ' + sal('do salão', 'da barbearia') + '</b> 💬 — ele confirma o horário com você. 😊';
         var gb = document.getElementById('goBtn');
         if(gb) gb.textContent = '💬 Pedir horário no WhatsApp';
       }
@@ -318,9 +328,9 @@
 
         if(!svc){ alert('Escolha um serviço 📅'); return; }
         if(!date){ alert('Escolha o dia.'); return; }
-        if(!isOpenDay(date)){ alert('O salão não atende nesse dia 😴\nEscolha outro, por favor 💜'); return; }
+        if(!isOpenDay(date)){ alert(sal('O salão', 'A barbearia') + ' não atende nesse dia 😴\nEscolha outro, por favor 💜'); return; }
         if(!time){ alert('Escolha um horário disponível na lista 🕗'); return; }
-        if(!name){ alert('Diz seu nome pro salão saber quem é 😊'); document.getElementById('fName').focus(); return; }
+        if(!name){ alert('Diz seu nome ' + sal('pro salão', 'pra barbearia') + ' saber quem é 😊'); document.getElementById('fName').focus(); return; }
         if(waPhone(phone).length < 12){ alert('Coloque seu WhatsApp com DDD pra reservar 📱'); document.getElementById('fPhone').focus(); return; }
 
         // conflito local (rápido) antes de bater no servidor
@@ -348,9 +358,9 @@
           } else if(res && (res.reason === 'conflict' || res.reason === 'busy_retry')){
             alert('Ihh, esse horário acabou de ser reservado por outra pessoa 😅\nEscolha outro, por favor 💜'); loadBusy(date);
           } else if(res && res.reason === 'lunch'){
-            alert('Esse horário é a pausa/almoço do salão 🍽️\nEscolha outro, por favor 💜'); loadBusy(date);
+            alert('Esse horário é a pausa/almoço ' + sal('do salão', 'da barbearia') + ' 🍽️\nEscolha outro, por favor 💜'); loadBusy(date);
           } else if(res && (res.reason === 'hours' || res.reason === 'day')){
-            alert('Esse horário está fora do expediente do salão 🕗\nEscolha outro, por favor.'); loadBusy(date);
+            alert('Esse horário está fora do expediente ' + sal('do salão', 'da barbearia') + ' 🕗\nEscolha outro, por favor.'); loadBusy(date);
           } else {
             // qualquer outra falha: não perde a cliente — manda o pedido pelo WhatsApp mesmo assim
             openWa(svc, date, time, name, phone, note);

@@ -1400,7 +1400,25 @@ function applyTheme(force) {
     const want = t === 'masc' ? img.dataset.masc : img.dataset.fem;
     if (img.getAttribute('src') !== want) img.setAttribute('src', want);
   });
+  // termo do negócio conforme o tema: "salão" (rosé) ⇄ "barbearia" (azul/masc)
+  document.querySelectorAll('[data-term-fem][data-term-masc]').forEach(el => {
+    const want = t === 'masc' ? el.dataset.termMasc : el.dataset.termFem;
+    if (el.textContent !== want) el.textContent = want;
+  });
   document.querySelectorAll('.tsw[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+}
+// Termo do negócio conforme o tema. Passa o texto feminino (rosé, "salão") e o
+// masculino (azul, "barbearia") já com o artigo certo — "salão" é masculino e
+// "barbearia" é feminino ("do salão" → "da barbearia"). Retorna um <span> que o
+// applyTheme mantém sincronizado quando o tema muda.
+function term(fem, masc) {
+  const cur = (document.documentElement.dataset.theme === 'masc') ? masc : fem;
+  return `<span data-term-fem="${fem}" data-term-masc="${masc}">${cur}</span>`;
+}
+// versão texto-puro (sem HTML) p/ nome padrão de negócio embutido em links/tokens
+function bizWordPlain(cap) {
+  const masc = (state && state.business && state.business.theme === 'masc');
+  return cap ? (masc ? 'Minha barbearia' : 'Meu salão') : (masc ? 'barbearia' : 'salão');
 }
 function render() {
   applyTheme();
@@ -1453,7 +1471,7 @@ function notifBarHTML() {
   const resumo = Object.entries(porGrupo).map(([g, n]) => `${g}: <b>${n}</b>`).join(' · ');
   return `<div class="notif-bar" id="notifBar">
     <span style="font-size:24px">🔔</span>
-    <div style="flex:1;min-width:0"><b>${un.length} aviso(s) novo(s) no seu salão</b>
+    <div style="flex:1;min-width:0"><b>${un.length} aviso(s) novo(s) no ${term('seu salão', 'sua barbearia')}</b>
       <div class="muted" style="font-size:13px;margin-top:2px">${resumo}</div></div>
     <button class="btn btn-primary btn-sm" data-act="central-avisos">Ver avisos →</button>
   </div>`;
@@ -2067,13 +2085,13 @@ function bookingLink() {
   }
   // Fallback (ex.: demonstração sem login): embute os dados no próprio link.
   const svc = (state.services || []).map(s => [s.name, s.price, s.dur || 60]);
-  const token = encodeBooking({ b: (state.business.name || 'Meu salão'), w: wa, s: svc, t: (state.business.theme === 'masc' ? 'masc' : 'fem') });
+  const token = encodeBooking({ b: (state.business.name || bizWordPlain(true)), w: wa, s: svc, t: (state.business.theme === 'masc' ? 'masc' : 'fem') });
   return bookingBaseUrl() + '#' + token;
 }
 function modalLinkAgendamento() {
   const wa = waPhone(state.business && state.business.whatsapp);
   if (!wa) {
-    openModal('🔗 Link de agendamento', `<p>Pra gerar seu link, cadastre primeiro o <b>WhatsApp do salão</b> — é pra lá que as clientes vão mandar os pedidos de horário.</p>`,
+    openModal('🔗 Link de agendamento', `<p>Pra gerar seu link, cadastre primeiro o <b>WhatsApp ${term('do salão', 'da barbearia')}</b> — é pra lá que as clientes vão mandar os pedidos de horário.</p>`,
       `<button class="btn btn-ghost" data-close>Depois</button><button class="btn btn-primary" id="lk_cfg">Cadastrar WhatsApp agora</button>`);
     $('#lk_cfg').onclick = () => { closeModal(); modalBiz(); };
     return;
@@ -2213,7 +2231,7 @@ function modalBiz() {
         <div class="tp ${curTheme === 'masc' ? 'on' : ''}" data-t="masc"><div class="tp-sw" style="background:linear-gradient(120deg,#2563eb,#1e3a8a)"></div><div class="tp-name">Masculino</div><div class="tp-sub">Azul</div></div>
       </div>
     </div>
-    <div class="field"><label>📲 WhatsApp do salão <span class="muted" style="font-weight:400">(pra receber os agendamentos das clientes)</span></label><input class="input" id="g_wa" inputmode="tel" placeholder="Ex.: (22) 99244-5995" value="${esc(b.whatsapp || '')}"/></div>
+    <div class="field"><label>📲 WhatsApp ${term('do salão', 'da barbearia')} <span class="muted" style="font-weight:400">(pra receber os agendamentos das clientes)</span></label><input class="input" id="g_wa" inputmode="tel" placeholder="Ex.: (22) 99244-5995" value="${esc(b.whatsapp || '')}"/></div>
     <div class="field"><label>🕐 Fuso horário <span class="muted" style="font-weight:400">(base do "hoje" no caixa e na agenda)</span></label>
       <select class="input" id="g_tz">${tzOpts.map(([v, l]) => `<option value="${v}"${tz === v ? ' selected' : ''}>${l}</option>`).join('')}</select>
       <p class="muted" style="font-size:12.5px;margin:6px 2px 0">🕐 Agora no fuso escolhido: <b id="g_tznow">—</b></p>
