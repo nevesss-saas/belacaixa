@@ -565,6 +565,17 @@ textarea{resize:vertical;min-height:70px}
 .baixa-info{font-size:12.5px;color:var(--violet);margin-top:8px;line-height:1.4}
 .baixa-info:empty{display:none}
 
+/* seletor de forma de pagamento (Pix, Dinheiro, Crédito, Débito) */
+.pay-opts{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+.pay-opt{flex:1 1 calc(50% - 4px);min-width:104px;display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:11px 10px;border:2px solid var(--line);border-radius:13px;background:#fff;cursor:pointer;
+  font-family:inherit;font-weight:600;font-size:14px;color:var(--ink);transition:.15s}
+.pay-opt svg{flex:0 0 auto;display:block}
+.pay-opt:hover{border-color:var(--sel)}
+.pay-opt.on{border-color:var(--rose);background:var(--tint-2);box-shadow:0 5px 16px -9px rgba(var(--glow),.75)}
+.pay-ic{display:inline-block;vertical-align:-3px;margin-right:5px}
+.pay-ic svg{width:16px;height:16px;display:block}
+
 /* ---- botões WhatsApp na agenda ---- */
 .appt-acts{gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .btn-wa{background:#25d366;color:#fff;text-decoration:none}

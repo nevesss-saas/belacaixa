@@ -830,7 +830,9 @@ VIEWS.financeiro = {
 };
 function txRow(t) {
   const cli = t.clientId ? state.clients.find(c => c.id === t.clientId) : null;
-  return `<tr><td class="muted">${fmtDateFull(t.date)}</td><td>${esc(t.desc)}</td><td><span class="tag-cat">${esc(t.category)}</span></td><td>${cli ? esc(cli.name.split(' ')[0]) : '—'}</td>
+  const payTag = t.pay ? `<span class="pay-ic" title="${PAY_LABEL[t.pay] || ''}">${payIcon(t.pay)}</span>` : '';
+  const feeTag = t.feeAdded ? ` <span class="muted" style="font-size:11px">(+${t.feePct}% maq.)</span>` : '';
+  return `<tr><td class="muted">${fmtDateFull(t.date)}</td><td>${payTag}${esc(t.desc)}${feeTag}</td><td><span class="tag-cat">${esc(t.category)}</span></td><td>${cli ? esc(cli.name.split(' ')[0]) : '—'}</td>
     <td class="num ${t.type === 'in' ? 't-in' : 't-out'}">${t.type === 'in' ? '+' : '−'} ${fmt(t.amount)}</td>
     <td class="num" style="white-space:nowrap"><button class="modal-x" data-act="edit-tx" data-id="${t.id}" title="Editar lançamento">✏️</button><button class="modal-x" data-act="del-tx" data-id="${t.id}" title="Excluir">🗑️</button></td></tr>`;
 }
@@ -1533,6 +1535,16 @@ function setView(v) { currentView = v; $('.sidebar')?.classList.remove('open'); 
 /* ============================================================
    MODAIS (formulários)
    ============================================================ */
+// Formas de pagamento (com ícone representando cada uma). credito/debito são "cartão"
+// e liberam o campo de taxa da maquininha.
+const PAY_OPTS = [
+  { id: 'pix', label: 'Pix', svg: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 2.6 6.9 7.7l2.5 2.5a3.7 3.7 0 0 1 5.2 0l2.5-2.5L12 2.6zM4.7 9.9l-2.1 2.1 2.1 2.1 2.5-2.1-2.5-2.1zm14.6 0-2.5 2.1 2.5 2.1 2.1-2.1-2.1-2.1zM12 13.8a2.2 2.2 0 0 1-1.6-.6l-2.5 2.5L12 20.8l4.1-5.1-2.5-2.5a2.2 2.2 0 0 1-1.6.6z" fill="#32BCAD"/></svg>' },
+  { id: 'dinheiro', label: 'Dinheiro', svg: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="2.3" y="6" width="19.4" height="12" rx="2" fill="#2ca05a"/><circle cx="12" cy="12" r="3" fill="#eafff2"/><circle cx="5.4" cy="12" r="1" fill="#eafff2"/><circle cx="18.6" cy="12" r="1" fill="#eafff2"/></svg>' },
+  { id: 'credito', label: 'Crédito', card: true, svg: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="2.3" y="5.4" width="19.4" height="13.2" rx="2.4" fill="#3b82f6"/><rect x="2.3" y="8.2" width="19.4" height="2.7" fill="#1e40af"/><rect x="5" y="14" width="5.5" height="2" rx="1" fill="#dbeafe"/></svg>' },
+  { id: 'debito', label: 'Débito', card: true, svg: '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="2.3" y="5.4" width="19.4" height="13.2" rx="2.4" fill="#8b5cf6"/><rect x="2.3" y="8.2" width="19.4" height="2.7" fill="#6d28d9"/><rect x="5" y="14" width="5.5" height="2" rx="1" fill="#ede9fe"/></svg>' },
+];
+const PAY_LABEL = { pix: 'Pix', dinheiro: 'Dinheiro', credito: 'Crédito', debito: 'Débito' };
+function payIcon(id) { const p = PAY_OPTS.find(x => x.id === id); return p ? p.svg : ''; }
 function modalAtendimento() {
   const servopts = state.services.map(s => `<option value="${esc(s.name)}">${fmt(s.price)}</option>`).join('');
   const clopts = state.clients.map(c => `<option value="${esc(c.name)}">`).join('');
@@ -1541,6 +1553,15 @@ function modalAtendimento() {
     <div class="field"><label>Serviço</label><input class="input" id="f_serv" list="servdl" placeholder="Escolha ou digite um serviço" value="${first ? esc(first.name) : ''}"/><datalist id="servdl">${servopts}</datalist><span class="muted" style="font-size:12.5px">Escolha da lista ou digite um serviço novo ✍️ — o valor você ajusta abaixo</span></div>
     <div class="field"><label>Cliente</label><input class="input" id="f_cli" list="clidl" placeholder="Nome da cliente"/><datalist id="clidl">${clopts}</datalist><span class="muted" style="font-size:12.5px">Cliente nova é cadastrada automaticamente ✨</span></div>
     <div class="field-row"><div class="field"><label>Valor (R$)</label><input class="input" id="f_val" type="number" step="0.01"/></div><div class="field"><label>Data</label><input class="input" id="f_date" type="date" value="${todayISO()}"/></div></div>
+    <div class="field"><label>Forma de pagamento</label>
+      <div class="pay-opts" id="f_pay">${PAY_OPTS.map(p => `<button type="button" class="pay-opt${p.id === 'pix' ? ' on' : ''}" data-pay="${p.id}">${p.svg}<span>${p.label}</span></button>`).join('')}</div>
+    </div>
+    <div class="field" id="pay_fee_box" style="display:none">
+      <label>Taxa da maquininha (%) <span class="muted" style="font-weight:400">— o que sua maquininha cobra nessa forma</span></label>
+      <input class="input" id="pay_fee" type="number" step="0.01" min="0" placeholder="Ex.: 3,5"/>
+      <label class="row" style="gap:8px;font-size:14px;margin-top:8px"><input type="checkbox" id="pay_fee_add" style="width:auto"/> Somar a taxa ao valor (repassar ao cliente)</label>
+      <div id="pay_fee_calc" class="muted" style="font-size:12.5px;margin-top:6px"></div>
+    </div>
     <label class="row" style="gap:8px;font-size:14px"><input type="checkbox" id="f_baixa" checked style="width:auto"/> Dar baixa no material usado (serviços conhecidos)</label>
     <div id="f_baixa_info" class="baixa-info"></div>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="f_save">Registrar</button>`);
@@ -1553,7 +1574,30 @@ function modalAtendimento() {
   };
   const svc0 = findServ(); if (svc0) $('#f_val').value = svc0.price;
   baixaInfo();
-  $('#f_serv').oninput = () => { const s = findServ(); if (s) $('#f_val').value = s.price; baixaInfo(); };
+  // ----- forma de pagamento + taxa da maquininha (só cartão) -----
+  let payMethod = 'pix';
+  const payFeeCalc = () => {
+    const box = $('#pay_fee_calc'); if (!box) return;
+    const val = parseFloat($('#f_val').value) || 0;
+    const fee = parseFloat($('#pay_fee').value) || 0;
+    if (!fee) { box.innerHTML = ''; return; }
+    const feeAmt = val * fee / 100;
+    box.innerHTML = $('#pay_fee_add').checked
+      ? `➕ Total com a taxa: <b>${fmt(val + feeAmt)}</b> <span class="muted">(${fmt(val)} + ${fee}%)</span>`
+      : `💳 A maquininha desconta ~${fmt(feeAmt)} — você recebe <b>${fmt(val - feeAmt)}</b>`;
+  };
+  const selPay = (id) => {
+    payMethod = id;
+    $('#f_pay').querySelectorAll('.pay-opt').forEach(b => b.classList.toggle('on', b.dataset.pay === id));
+    const isCard = (id === 'credito' || id === 'debito');
+    $('#pay_fee_box').style.display = isCard ? '' : 'none';
+    if (isCard) { const def = (state.business.cardFees || {})[id]; $('#pay_fee').value = (def != null ? def : ''); payFeeCalc(); }
+  };
+  $('#f_pay').querySelectorAll('.pay-opt').forEach(b => b.onclick = () => selPay(b.dataset.pay));
+  $('#pay_fee').oninput = payFeeCalc;
+  $('#pay_fee_add').onchange = payFeeCalc;
+  $('#f_serv').oninput = () => { const s = findServ(); if (s) $('#f_val').value = s.price; baixaInfo(); payFeeCalc(); };
+  $('#f_val').oninput = payFeeCalc;
   $('#f_save').onclick = () => {
     const servName = $('#f_serv').value.trim();
     const name = $('#f_cli').value.trim(); const val = parseFloat($('#f_val').value);
@@ -1562,9 +1606,21 @@ function modalAtendimento() {
     let cli = findClientByContact(name, '');
     if (!cli) { cli = { id: 'c_' + uid(), name, phone: '', notes: '', createdAt: todayISO() }; state.clients.push(cli); toast(`Cliente "${name}" cadastrada automaticamente 💖`, 'ok'); }
     const service = findServ();
-    state.transactions.push({ id: uid(), type: 'in', category: 'Atendimentos', amount: val, desc: servName + ' — ' + name.split(' ')[0], date: $('#f_date').value, clientId: cli.id });
+    // cartão: lembra o % da maquininha e, se marcado, soma a taxa ao valor (repassa ao cliente)
+    let amount = val; const extra = { pay: payMethod };
+    if (payMethod === 'credito' || payMethod === 'debito') {
+      const fee = parseFloat($('#pay_fee').value) || 0;
+      if (fee > 0) {
+        state.business.cardFees = state.business.cardFees || {};
+        state.business.cardFees[payMethod] = fee;         // vira o padrão da próxima vez
+        extra.feePct = fee;
+        if ($('#pay_fee_add').checked) { amount = +(val + val * fee / 100).toFixed(2); extra.feeAdded = true; }
+      }
+    }
+    state.transactions.push({ id: uid(), type: 'in', category: 'Atendimentos', amount, desc: servName + ' — ' + name.split(' ')[0], date: $('#f_date').value, clientId: cli.id, ...extra });
     if (service && $('#f_baixa').checked) deduct(service);
-    save(); closeModal(); render(); toast('Atendimento registrado! ' + fmt(val) + ' no caixa.', 'ok');
+    save(); closeModal(); render();
+    toast('Atendimento registrado! ' + fmt(amount) + ' no caixa · ' + PAY_LABEL[payMethod] + '.', 'ok');
   };
 }
 function deduct(service) {
