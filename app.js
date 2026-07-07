@@ -1345,9 +1345,13 @@ function updatePrivacyEye() {
   eye.onclick = () => { privacyUnlocked = false; render(); toast('Valores ocultados 🔒', 'info'); };
 }
 
+const THEME_KEY = 'belacaixa_theme', THEME_CHOSEN_KEY = 'belacaixa_theme_chosen';
+function savedThemePref() { try { const t = localStorage.getItem(THEME_KEY); return (t === 'masc' || t === 'fem') ? t : null; } catch (e) { return null; } }
+function themeChosen() { try { return !!localStorage.getItem(THEME_CHOSEN_KEY); } catch (e) { return false; } }
 function applyTheme(force) {
   const t = force || ((state && state.business && state.business.theme === 'masc') ? 'masc' : 'fem');
   document.documentElement.setAttribute('data-theme', t);
+  try { localStorage.setItem(THEME_KEY, t); if (!force) localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
   document.querySelectorAll('img[data-fem][data-masc]').forEach(img => {
     const want = t === 'masc' ? img.dataset.masc : img.dataset.fem;
     if (img.getAttribute('src') !== want) img.setAttribute('src', want);
@@ -2295,7 +2299,15 @@ function showAuth(mode) {
   setAuthMode(mode || 'login');
   $('#landing').hidden = true; $('#app').hidden = true; $('#authScreen').hidden = false;
   $('#auErr').hidden = true; document.body.style.background = '';
+  refreshAuthTheme();
   window.scrollTo(0, 0);
+}
+function refreshAuthTheme() {
+  const saved = savedThemePref() || 'fem';
+  applyTheme(saved);
+  const box = $('#au_theme'); if (box) box.querySelectorAll('.tp').forEach(c => c.classList.toggle('on', c.dataset.t === saved));
+  const note = $('#authThemeNote'); if (note) note.classList.toggle('first', !themeChosen());
+  if (!themeChosen()) toast('💗 Rosa ou 💙 Azul? Toque no tema que você prefere logo acima. ↑', 'info');
 }
 function setAuthMode(mode) {
   authMode = mode;
@@ -2320,6 +2332,14 @@ function wireAuth() {
   $('#auSwitch').onclick = e => { e.preventDefault(); setAuthMode(authMode === 'signup' ? 'login' : 'signup'); };
   $$('[data-auth-back]').forEach(b => b.onclick = () => exitApp());
   $('#authForm').addEventListener('submit', onAuthSubmit);
+  const th = $('#au_theme');
+  if (th) th.querySelectorAll('.tp').forEach(c => c.onclick = () => {
+    th.querySelectorAll('.tp').forEach(x => x.classList.toggle('on', x === c));
+    applyTheme(c.dataset.t);
+    try { localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
+    const note = $('#authThemeNote'); if (note) note.classList.remove('first');
+    toast('Tema ' + (c.dataset.t === 'masc' ? 'Azul 💙' : 'Rosa 💗') + ' aplicado!', 'ok');
+  });
 }
 async function onAuthSubmit(e) {
   e.preventDefault();
@@ -2335,7 +2355,12 @@ async function onAuthSubmit(e) {
       if (!data.session) { const r = await sb.auth.signInWithPassword({ email, password: pass }); if (r.error) throw r.error; currentUser = r.data.user; }
       else currentUser = data.user;
       await cloudLoad();
-      if (biz && state) { state.business.name = biz; save(); }
+      const _th = savedThemePref();
+      if (state) {
+        if (biz) state.business.name = biz;
+        if (_th) state.business.theme = _th;
+        if (biz || _th) save();
+      }
     } else {
       const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
       if (error) throw error;
@@ -2591,6 +2616,7 @@ function demoSignup() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  applyTheme(savedThemePref() || 'fem');   // reflete o tema escolhido já na landing/login
   $$('[data-enter]').forEach(b => b.onclick = () => enterApp());
   $$('[data-demo]').forEach(b => b.onclick = () => enterDemo());
   $$('[data-demo-signup]').forEach(b => b.onclick = () => demoSignup());
