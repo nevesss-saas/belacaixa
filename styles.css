@@ -576,6 +576,17 @@ textarea{resize:vertical;min-height:70px}
 .pay-ic{display:inline-block;vertical-align:-3px;margin-right:5px}
 .pay-ic svg{width:16px;height:16px;display:block}
 
+/* categoria personalizada (+ incluir) em Nova entrada / Nova saída */
+.cat-wrap{display:flex;gap:7px;align-items:stretch}
+.cat-wrap select{flex:1 1 auto;min-width:0}
+.cat-add-btn{flex:0 0 auto;width:42px;border:1.5px solid var(--line);border-radius:11px;background:var(--tint-2);
+  color:var(--rose);font-size:22px;font-weight:700;line-height:1;cursor:pointer;transition:.15s}
+.cat-add-btn:hover{border-color:var(--rose);background:var(--rose);color:#fff}
+.cat-new{display:flex;gap:7px;align-items:center;margin-top:8px}
+.cat-new .input{flex:1 1 auto;min-width:0}
+.cat-new .btn-sm{flex:0 0 auto}
+.cat-new .cat-x{padding:8px 11px;font-size:17px;line-height:1}
+
 /* ---- botões WhatsApp na agenda ---- */
 .appt-acts{gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .btn-wa{background:#25d366;color:#fff;text-decoration:none}

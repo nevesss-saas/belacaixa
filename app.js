@@ -1697,13 +1697,38 @@ function modalTx(type, editId) {
   const tx = editId ? state.transactions.find(t => t.id === editId) : null;
   if (editId && !tx) return;
   if (tx) type = tx.type;
-  const cats = type === 'in' ? ['Atendimentos', 'Venda de produtos', 'Outros'] : ['Matéria-prima', 'Aluguel', 'Energia / Água', 'Marketing', 'Salários / Comissão', 'Manutenção', 'Outros'];
+  const baseCats = type === 'in' ? ['Atendimentos', 'Venda de produtos', 'Outros'] : ['Matéria-prima', 'Aluguel', 'Energia / Água', 'Marketing', 'Salários / Comissão', 'Manutenção', 'Outros'];
+  state.business.customCats = state.business.customCats || { in: [], out: [] };
+  const custom = (state.business.customCats[type] || []).filter(c => !baseCats.includes(c));   // categorias criadas pelo dono
+  const oi = baseCats.indexOf('Outros');   // personalizadas entram logo antes de "Outros"
+  const cats = oi >= 0 ? [...baseCats.slice(0, oi), ...custom, ...baseCats.slice(oi)] : [...baseCats, ...custom];
   if (tx && tx.category && !cats.includes(tx.category)) cats.push(tx.category);   // não perde categoria antiga
   openModal(tx ? (type === 'in' ? '✏️ Editar entrada' : '✏️ Editar saída') : (type === 'in' ? 'Nova entrada' : 'Nova saída'), `
     <div class="field"><label>Descrição</label><input class="input" id="t_desc" placeholder="${type === 'in' ? 'Ex.: Venda de kit de esmaltes' : 'Ex.: Conta de luz'}" value="${tx ? esc(tx.desc) : ''}"/></div>
-    <div class="field-row"><div class="field"><label>Valor (R$)</label><input class="input" id="t_val" type="number" step="0.01" value="${tx ? tx.amount : ''}"/></div><div class="field"><label>Categoria</label><select id="t_cat">${cats.map(c => `<option${tx && tx.category === c ? ' selected' : ''}>${c}</option>`).join('')}</select></div></div>
+    <div class="field-row"><div class="field"><label>Valor (R$)</label><input class="input" id="t_val" type="number" step="0.01" value="${tx ? tx.amount : ''}"/></div><div class="field"><label>Categoria</label><div class="cat-wrap"><select id="t_cat">${cats.map(c => `<option${tx && tx.category === c ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select><button type="button" class="cat-add-btn" id="t_cat_add" title="Nova categoria" aria-label="Nova categoria">＋</button></div><div class="cat-new" id="t_cat_new" hidden><input class="input" id="t_cat_name" placeholder="Nova categoria" maxlength="28"/><button type="button" class="btn btn-primary btn-sm" id="t_cat_ok">Incluir</button><button type="button" class="btn btn-ghost btn-sm cat-x" id="t_cat_cancel" aria-label="Cancelar">×</button></div></div></div>
     <div class="field"><label>Data</label><input class="input" id="t_date" type="date" value="${tx ? tx.date : todayISO()}"/></div>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="t_save">Salvar</button>`);
+  // Categoria personalizada: botão ＋ abre um campo pra criar e salva na conta (state.business.customCats).
+  const catSel = $('#t_cat'), catNew = $('#t_cat_new'), catName = $('#t_cat_name');
+  $('#t_cat_add').onclick = () => { catNew.hidden = false; catName.focus(); };
+  $('#t_cat_cancel').onclick = () => { catNew.hidden = true; catName.value = ''; };
+  function addCat() {
+    const name = catName.value.trim();
+    if (!name) return toast('Digite o nome da categoria.', 'warn');
+    const dup = [...catSel.options].find(o => o.value.toLowerCase() === name.toLowerCase());
+    if (dup) { catSel.value = dup.value; catNew.hidden = true; catName.value = ''; return toast('Essa categoria já existe.', 'warn'); }
+    state.business.customCats[type] = state.business.customCats[type] || [];
+    state.business.customCats[type].push(name);
+    save();
+    const opt = document.createElement('option'); opt.textContent = name;
+    const outros = [...catSel.options].find(o => o.value === 'Outros');
+    if (outros) catSel.insertBefore(opt, outros); else catSel.appendChild(opt);
+    catSel.value = name;
+    catNew.hidden = true; catName.value = '';
+    toast('Categoria "' + name + '" adicionada ✅', 'ok');
+  }
+  $('#t_cat_ok').onclick = addCat;
+  catName.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addCat(); } });
   $('#t_save').onclick = () => {
     const val = parseFloat($('#t_val').value), desc = $('#t_desc').value.trim() || $('#t_cat').value;
     if (!(val > 0)) return toast('Informe um valor válido.', 'warn');
