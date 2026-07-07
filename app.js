@@ -48,7 +48,8 @@ const fmtDateFull = iso => { const [y, m, d] = iso.split('-'); return `${d}/${m}
 const dayName = iso => ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][new Date(iso + 'T12:00').getDay()];
 const initials = n => n.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 const AVCOLORS = ['#f43f8e', '#9b5de5', '#00b389', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6', '#06b6d4'];
-const avColor = s => AVCOLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % AVCOLORS.length];
+const AVCOLORS_MASC = ['#1d4ed8', '#1e3a8a', '#00b389', '#f59e0b', '#3b82f6', '#0891b2', '#334155', '#06b6d4'];
+const avColor = s => { const a = document.documentElement.dataset.theme === 'masc' ? AVCOLORS_MASC : AVCOLORS; return a[[...s].reduce((x, c) => x + c.charCodeAt(0), 0) % a.length]; };
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -264,7 +265,7 @@ function seed() {
 
   return {
     v: 1,
-    business: { name: 'Nails e Pedicure', timezone: DEFAULT_TZ, reserveTarget: 5000, monthlyGoal: 8000, hours: { open: '09:00', close: '19:00', days: [1, 2, 3, 4, 5, 6], slot: 30 } },
+    business: { name: 'Nails e Pedicure', theme: 'fem', timezone: DEFAULT_TZ, reserveTarget: 5000, monthlyGoal: 8000, hours: { open: '09:00', close: '19:00', days: [1, 2, 3, 4, 5, 6], slot: 30 } },
     security: { pinHash: '' },
     clients, services, inventory: inv, transactions: tx, appointments: appts, assets, investments,
     patHist, chat: []
@@ -574,7 +575,7 @@ function svgCashflow(data) {
 }
 
 function svgDonut(data) {
-  const COLORS = ['#f43f8e', '#9b5de5', '#00b389', '#f59e0b', '#3b82f6', '#ec4899', '#06b6d4'];
+  const COLORS = document.documentElement.dataset.theme === 'masc' ? ['#1d4ed8', '#0891b2', '#00b389', '#f59e0b', '#3b82f6', '#6366f1', '#06b6d4'] : ['#f43f8e', '#9b5de5', '#00b389', '#f59e0b', '#3b82f6', '#ec4899', '#06b6d4'];
   const total = data.reduce((a, d) => a + d.value, 0) || 1;
   const R = 64, C = 2 * Math.PI * R; let off = 0; let segs = '';
   data.forEach((d, i) => {
@@ -663,10 +664,10 @@ VIEWS.dashboard = {
     return `
     <div class="section-head"><div></div><button class="btn btn-primary" data-act="new-atendimento">＋ Registrar atendimento</button></div>
     <div class="grid cols-4">
-      ${kpi('💵', 'Saldo em caixa', fmt(balance()), '', 'linear-gradient(135deg,#f43f8e,#9b5de5)')}
+      ${kpi('💵', 'Saldo em caixa', fmt(balance()), '', 'var(--grad)')}
       ${kpi('⬆️', 'Entradas (mês)', fmt(cur.in), delta(cur.in, prev.in), '#e2f8f1', '#00b389')}
       ${kpi('⬇️', 'Saídas (mês)', fmt(cur.out), delta(cur.out, prev.out), '#fde7ec', '#f0476a')}
-      ${kpi('💎', 'Lucro líquido (mês)', fmt(cur.profit), delta(cur.profit, prev.profit), '#f3e8ff', '#9b5de5')}
+      ${kpi('💎', 'Lucro líquido (mês)', fmt(cur.profit), delta(cur.profit, prev.profit), 'var(--tint)', 'var(--violet)')}
     </div>
 
     <div class="grid cols-2 mt">
@@ -699,12 +700,12 @@ VIEWS.dashboard = {
     </div>`;
   }
 };
-function kpi(ico, label, value, delta = '', icoBg = '#f3e8ff', icoColor = '#9b5de5') {
-  const bg = icoBg.startsWith('linear') ? icoBg : icoBg; const col = icoBg.startsWith('linear') ? '#fff' : icoColor;
+function kpi(ico, label, value, delta = '', icoBg = 'var(--tint)', icoColor = 'var(--violet)') {
+  const bg = icoBg; const col = icoBg.includes('grad') ? '#fff' : icoColor;
   return `<div class="kpi"><div class="kpi-ico" style="background:${bg};color:${col}">${ico}</div><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div>${delta}</div>`;
 }
 function insightCard(i) {
-  return `<div class="insight tone-${i.tone}"><div class="ins-ico" style="background:${{ green: '#e2f8f1', amber: '#fef3df', violet: '#f3e8ff', blue: '#e6effd' }[i.tone]}">${i.ico}</div>
+  return `<div class="insight tone-${i.tone}"><div class="ins-ico" style="background:${{ green: '#e2f8f1', amber: '#fef3df', violet: 'var(--tint)', blue: '#e6effd' }[i.tone]}">${i.ico}</div>
     <div style="flex:1"><h4>${esc(i.title)}</h4><p>${esc(i.text)}</p>${i.act ? `<button class="btn btn-soft btn-sm" style="margin-top:8px" data-act="${i.act}">${esc(i.actLabel)} →</button>` : ''}</div></div>`;
 }
 function stockRow(it) {
@@ -770,7 +771,7 @@ VIEWS.financeiro = {
     <div class="grid cols-3">
       ${kpi('⬆️', 'Entradas · ' + rl, fmt(fIn), '', '#e2f8f1', '#00b389')}
       ${kpi('⬇️', 'Saídas · ' + rl, fmt(fOut), '', '#fde7ec', '#f0476a')}
-      ${kpi('💎', 'Resultado · ' + rl, fmt(fIn - fOut), `<span class="kpi-delta ${fIn - fOut >= 0 ? 'delta-up' : 'delta-down'}">margem ${fIn ? Math.round((fIn - fOut) / fIn * 100) : 0}%</span>`, '#f3e8ff', '#9b5de5')}
+      ${kpi('💎', 'Resultado · ' + rl, fmt(fIn - fOut), `<span class="kpi-delta ${fIn - fOut >= 0 ? 'delta-up' : 'delta-down'}">margem ${fIn ? Math.round((fIn - fOut) / fIn * 100) : 0}%</span>`, 'var(--tint)', 'var(--violet)')}
     </div>
 
     <div class="card mt">
@@ -845,7 +846,7 @@ VIEWS.agenda = {
       </div>
     </div>
 
-    <div class="insight tone-violet mt" style="max-width:none"><div class="ins-ico" style="background:#f3e8ff">🤖</div>
+    <div class="insight tone-violet mt" style="max-width:none"><div class="ins-ico" style="background:var(--tint)">🤖</div>
       <div><h4>Sugestão automática de horário</h4><p>O próximo encaixe livre é <b>${nextSlot.full}</b>. Quer agendar agora?</p>
       <button class="btn btn-soft btn-sm" style="margin-top:8px" data-act="new-agenda">Usar este horário →</button></div></div>
 
@@ -879,7 +880,7 @@ function apptRow(a) {
   if (a.pending && a.source === 'link') {
     return `<div class="row between appt-row" style="padding:12px;border-bottom:1px dashed var(--line);background:#faf6ff;border-radius:12px;margin-bottom:6px">
       <div class="row" style="gap:12px"><span class="cli-av" style="background:${avColor(a.clientName)}">${initials(a.clientName)}</span>
-        <div><b>${a.time}</b> · ${esc(a.clientName)} <span class="tag-cat" style="background:#f3e8ff;color:#7c3aed">⏳ pedido pelo link</span><div class="muted" style="font-size:13px">${esc(a.serviceName)} · ${fmt(a.price)}${a.phone ? ' · 📞 ' + esc(a.phone) : ''}</div></div></div>
+        <div><b>${a.time}</b> · ${esc(a.clientName)} <span class="tag-cat" style="background:var(--tint);color:#7c3aed">⏳ pedido pelo link</span><div class="muted" style="font-size:13px">${esc(a.serviceName)} · ${fmt(a.price)}${a.phone ? ' · 📞 ' + esc(a.phone) : ''}</div></div></div>
       <div class="row appt-acts">
         <button class="btn btn-sm btn-primary" data-act="accept-appt" data-id="${a.id}">✅ Aceitar</button>
         <button class="modal-x" data-act="cancel-appt" data-id="${a.id}" title="Recusar">×</button>
@@ -967,9 +968,9 @@ VIEWS.patrimonio = {
     const growth = series.length > 1 ? Math.round((series.at(-1).value - series[0].value) / (series[0].value || 1) * 100) : 0;
     return `
     <div class="grid cols-4">
-      ${kpi('🏛️', 'Patrimônio total', fmt(patrimonioTotal()), `<span class="kpi-delta ${growth >= 0 ? 'delta-up' : 'delta-down'}">${growth >= 0 ? '▲' : '▼'} ${Math.abs(growth)}% em 6m</span>`, 'linear-gradient(135deg,#f43f8e,#9b5de5)')}
+      ${kpi('🏛️', 'Patrimônio total', fmt(patrimonioTotal()), `<span class="kpi-delta ${growth >= 0 ? 'delta-up' : 'delta-down'}">${growth >= 0 ? '▲' : '▼'} ${Math.abs(growth)}% em 6m</span>`, 'var(--grad)')}
       ${kpi('📈', 'Investimentos', fmt(investTotal()), '', '#e6effd', '#3b82f6')}
-      ${kpi('🪑', 'Bens & equipamentos', fmt(assetsTotal()), '', '#f3e8ff', '#9b5de5')}
+      ${kpi('🪑', 'Bens & equipamentos', fmt(assetsTotal()), '', 'var(--tint)', 'var(--violet)')}
       ${kpi('💵', 'Em caixa', fmt(Math.max(0, balance())), '', '#e2f8f1', '#00b389')}
     </div>
 
@@ -977,7 +978,7 @@ VIEWS.patrimonio = {
       <div class="card"><div class="section-head"><div><h2>Evolução do patrimônio</h2><span class="sh-sub">Caixa + bens nos últimos 6 meses</span></div></div>${svgLine(series)}</div>
       <div class="card">
         <div class="section-head"><div><h2>🤖 Sugestões de investimento</h2><span class="sh-sub">Com base no seu caixa livre de ${fmt(inv.fc)}</span></div></div>
-        ${inv.list.length ? inv.list.map(s => `<div class="insight tone-${s.tone}" style="margin-bottom:10px"><div class="ins-ico" style="background:${{ green: '#e2f8f1', amber: '#fef3df', violet: '#f3e8ff', blue: '#e6effd' }[s.tone]}">${s.ico}</div>
+        ${inv.list.length ? inv.list.map(s => `<div class="insight tone-${s.tone}" style="margin-bottom:10px"><div class="ins-ico" style="background:${{ green: '#e2f8f1', amber: '#fef3df', violet: 'var(--tint)', blue: '#e6effd' }[s.tone]}">${s.ico}</div>
           <div style="flex:1"><div class="row between"><h4>${esc(s.title)}</h4><b style="font-family:var(--display);color:var(--violet)">${fmt(s.alloc)}</b></div><p>${esc(s.detail)}</p><span class="badge b-green" style="margin-top:6px">Retorno: ${esc(s.ret)}</span></div></div>`).join('') : `<div class="empty"><span class="e-ico">🌱</span>Fortaleça o caixa para liberar sugestões de investimento.</div>`}
       </div>
     </div>
@@ -1171,8 +1172,8 @@ function adminHTML(d) {
     <div class="grid cols-4">
       ${kpi('👥', 'Usuários cadastrados', d.totalUsers, '', 'linear-gradient(135deg,#3b82f6,#06b6d4)')}
       ${kpi('✅', 'Assinaturas ativas', d.activeCount, '', '#e2f8f1', '#00b389')}
-      ${kpi('💳', 'Cartão · 📲 Pix', d.cardCount + ' · ' + d.pixCount, '', '#f3e8ff', '#9b5de5')}
-      ${kpi('💰', 'Receita mensal (MRR)', fmt(d.mrr), `<span class="kpi-delta">≈ ${fmt(d.arr)}/ano</span>`, 'linear-gradient(135deg,#f43f8e,#9b5de5)')}
+      ${kpi('💳', 'Cartão · 📲 Pix', d.cardCount + ' · ' + d.pixCount, '', 'var(--tint)', 'var(--violet)')}
+      ${kpi('💰', 'Receita mensal (MRR)', fmt(d.mrr), `<span class="kpi-delta">≈ ${fmt(d.arr)}/ano</span>`, 'var(--grad)')}
     </div>
     <div class="card mt">
       <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
@@ -1344,7 +1345,12 @@ function updatePrivacyEye() {
   eye.onclick = () => { privacyUnlocked = false; render(); toast('Valores ocultados 🔒', 'info'); };
 }
 
+function applyTheme() {
+  const t = (state && state.business && state.business.theme === 'masc') ? 'masc' : 'fem';
+  document.documentElement.setAttribute('data-theme', t);
+}
 function render() {
+  applyTheme();
   const novos = syncShoppingList();   // itens que chegaram no mínimo entram sozinhos na lista de compras
   if (novos.length) toast(novos.length === 1 ? novos[0] + ' entrou na lista de compras — está acabando' : novos.length + ' materiais entraram na lista de compras', 'warn');
   const v = VIEWS[currentView];
@@ -1702,7 +1708,7 @@ function modalAgenda(pre) {
   const clopts = state.clients.map(c => `<option value="${esc(c.name)}">`).join('');
   const h = bizHours();
   openModal(p.editId ? 'Editar / remarcar horário' : 'Agendar atendimento', `
-    ${p.fromLink ? `<div class="insight tone-violet" style="margin:0 0 12px;max-width:none"><div class="ins-ico" style="background:#f3e8ff">📲</div><div><h4 style="margin:0">Pedido pelo seu link 💜</h4><p style="margin:2px 0 0">Confira os dados e toque em <b>Agendar</b> pra confirmar.${p.note ? '<br><b>Obs. da cliente:</b> ' + esc(p.note) : ''}<br>${linkedCli ? '✅ <b>Cliente já cadastrada:</b> ' + esc(linkedCli.name) + ' — vou vincular a esta ficha' : '✨ <b>Cliente nova</b> — vou cadastrar ao confirmar'}${p.phone ? ' · 📞 ' + esc(p.phone) : ''}</p></div></div>` : ''}
+    ${p.fromLink ? `<div class="insight tone-violet" style="margin:0 0 12px;max-width:none"><div class="ins-ico" style="background:var(--tint)">📲</div><div><h4 style="margin:0">Pedido pelo seu link 💜</h4><p style="margin:2px 0 0">Confira os dados e toque em <b>Agendar</b> pra confirmar.${p.note ? '<br><b>Obs. da cliente:</b> ' + esc(p.note) : ''}<br>${linkedCli ? '✅ <b>Cliente já cadastrada:</b> ' + esc(linkedCli.name) + ' — vou vincular a esta ficha' : '✨ <b>Cliente nova</b> — vou cadastrar ao confirmar'}${p.phone ? ' · 📞 ' + esc(p.phone) : ''}</p></div></div>` : ''}
     <div class="field"><label>Cliente</label><input class="input" id="a_cli" list="adl" placeholder="Nome da cliente" value="${p.cli ? esc(p.cli) : ''}"/><datalist id="adl">${clopts}</datalist></div>
     <div class="field"><label>Serviço</label><select id="a_serv">${opts}</select></div>
     <div class="field-row"><div class="field"><label>Data</label><input class="input" id="a_date" type="date" value="${slot.iso}"/></div><div class="field"><label>Horário</label><input class="input" id="a_time" type="time" value="${slot.time}"/></div></div>
@@ -2132,6 +2138,7 @@ function modalPinForgot() {
 
 function modalBiz() {
   const b = state.business;
+  const curTheme = b.theme === 'masc' ? 'masc' : 'fem';
   const h = bizHours();
   const tz = b.timezone || DEFAULT_TZ;
   const diasLbl = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -2147,6 +2154,12 @@ function modalBiz() {
   ];
   openModal('Configurações do negócio', `
     <div class="field"><label>Nome do negócio</label><input class="input" id="g_name" value="${esc(b.name)}"/></div>
+    <div class="field"><label>🎨 Tema do painel <span class="muted" style="font-weight:400">(identidade visual do sistema)</span></label>
+      <div class="theme-pick" id="g_theme">
+        <div class="tp ${curTheme === 'fem' ? 'on' : ''}" data-t="fem"><div class="tp-sw" style="background:linear-gradient(120deg,#f43f8e,#9b5de5)"></div><div class="tp-name">Feminino</div><div class="tp-sub">Rosé (padrão)</div></div>
+        <div class="tp ${curTheme === 'masc' ? 'on' : ''}" data-t="masc"><div class="tp-sw" style="background:linear-gradient(120deg,#2563eb,#1e3a8a)"></div><div class="tp-name">Masculino</div><div class="tp-sub">Azul</div></div>
+      </div>
+    </div>
     <div class="field"><label>📲 WhatsApp do salão <span class="muted" style="font-weight:400">(pra receber os agendamentos das clientes)</span></label><input class="input" id="g_wa" inputmode="tel" placeholder="Ex.: (22) 99244-5995" value="${esc(b.whatsapp || '')}"/></div>
     <div class="field"><label>🕐 Fuso horário <span class="muted" style="font-weight:400">(base do "hoje" no caixa e na agenda)</span></label>
       <select class="input" id="g_tz">${tzOpts.map(([v, l]) => `<option value="${v}"${tz === v ? ' selected' : ''}>${l}</option>`).join('')}</select>
@@ -2183,6 +2196,7 @@ function modalBiz() {
     <button class="btn btn-danger btn-sm" id="g_reset">↺ Restaurar dados de demonstração</button>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="g_save">Salvar</button>`);
   bindPinSection();
+  $('#g_theme').querySelectorAll('.tp').forEach(c => c.onclick = () => { $('#g_theme').querySelectorAll('.tp').forEach(x => x.classList.toggle('on', x === c)); document.documentElement.setAttribute('data-theme', c.dataset.t); });
   $('#g_days').querySelectorAll('button[data-d]').forEach(btn => btn.onclick = () => { btn.classList.toggle('btn-primary'); btn.classList.toggle('btn-ghost'); });
   // almoço: liga/desliga a caixa, alterna "dias específicos", e chips clicáveis
   const lunchBox = $('#g_lunch_box'), lunchDaysRow = $('#g_lunch_days'), lunchScope = $('#g_lunch_scope');
@@ -2200,6 +2214,7 @@ function modalBiz() {
   $('#g_tz').onchange = tzNow; tzNow();
   const tzTimer = setInterval(() => { if (!$('#g_tznow')) return clearInterval(tzTimer); tzNow(); }, 20000);
   $('#g_save').onclick = () => {
+    const _th = $('#g_theme .tp.on'); b.theme = _th && _th.dataset.t === 'masc' ? 'masc' : 'fem';
     b.name = $('#g_name').value.trim() || b.name; b.reserveTarget = +$('#g_res').value || b.reserveTarget; b.monthlyGoal = +$('#g_goal').value || b.monthlyGoal;
     b.whatsapp = waPhone($('#g_wa').value);
     b.timezone = $('#g_tz').value || DEFAULT_TZ;
