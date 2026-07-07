@@ -601,10 +601,12 @@ function svgLine(points) {
   for (let g = 0; g <= 4; g++) { const y = pad + innerH - innerH * g / 4; grid += `<line x1="${pad}" y1="${y}" x2="${W}" y2="${y}" stroke="#eee4ec"/><text x="2" y="${y + 4}" font-size="10" fill="#8c8398">${fmtK(min + (max - min) * g / 4)}</text>`; }
   const line = points.map((p, i) => `${X(i)},${Y(p.value)}`).join(' ');
   const area = `${pad},${pad + innerH} ${line} ${X(points.length - 1)},${pad + innerH}`;
-  const dots = points.map((p, i) => `<circle cx="${X(i)}" cy="${Y(p.value)}" r="4.5" fill="#fff" stroke="#9b5de5" stroke-width="2.5"><title>${p.label}: ${fmt(p.value)}</title></circle>`).join('');
+  // cor de acento segue o tema (roxo no rosé / azul no masculino) — atributos SVG não aceitam var()
+  const acc = document.documentElement.dataset.theme === 'masc' ? '#1d4ed8' : '#9b5de5';
+  const dots = points.map((p, i) => `<circle cx="${X(i)}" cy="${Y(p.value)}" r="4.5" fill="#fff" stroke="${acc}" stroke-width="2.5"><title>${p.label}: ${fmt(p.value)}</title></circle>`).join('');
   const labels = points.map((p, i) => `<text x="${X(i)}" y="${H - 6}" font-size="11" fill="#5b5168" text-anchor="middle">${p.label}</text>`).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%"><defs><linearGradient id="gArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9b5de5" stop-opacity=".28"/><stop offset="1" stop-color="#9b5de5" stop-opacity="0"/></linearGradient></defs>
-    ${grid}<polygon points="${area}" fill="url(#gArea)"/><polyline points="${line}" fill="none" stroke="#9b5de5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${dots}${labels}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%"><defs><linearGradient id="gArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${acc}" stop-opacity=".28"/><stop offset="1" stop-color="${acc}" stop-opacity="0"/></linearGradient></defs>
+    ${grid}<polygon points="${area}" fill="url(#gArea)"/><polyline points="${line}" fill="none" stroke="${acc}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${dots}${labels}</svg>`;
 }
 
 function patrimonioSeries() {
@@ -2023,7 +2025,7 @@ function bookingLink() {
   }
   // Fallback (ex.: demonstração sem login): embute os dados no próprio link.
   const svc = (state.services || []).map(s => [s.name, s.price, s.dur || 60]);
-  const token = encodeBooking({ b: (state.business.name || 'Meu salão'), w: wa, s: svc });
+  const token = encodeBooking({ b: (state.business.name || 'Meu salão'), w: wa, s: svc, t: (state.business.theme === 'masc' ? 'masc' : 'fem') });
   return bookingBaseUrl() + '#' + token;
 }
 function modalLinkAgendamento() {

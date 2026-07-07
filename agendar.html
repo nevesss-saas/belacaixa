@@ -14,14 +14,21 @@
     :root{
       --violet:#9b5de5; --pink:#f43f8e; --ink:#2b2540; --muted:#8b849b;
       --line:#ece7f5; --bg:#f7f4fc; --wa:#25d366; --wa-d:#1ebe5a; --card:#fff;
+      --soft:#f3e8ff; --svc-on:#faf6ff; --svc-hover:#dcccf5; --ring:155,93,229; --card-sh:120,70,190;
+    }
+    /* tema azul ("masculino") — escolhido pelo salão no painel; recolore acentos/cabeçalho */
+    html[data-theme="masc"]{
+      --violet:#1e3a8a; --pink:#1d4ed8;
+      --line:#dbe6fb; --bg:#f4f8ff;
+      --soft:#e6effd; --svc-on:#eef4fe; --svc-hover:#c3d8fb; --ring:37,99,235; --card-sh:37,99,235;
     }
     *{box-sizing:border-box}
     body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--ink);
-      background:linear-gradient(160deg,#f3e8ff 0%,var(--bg) 40%);min-height:100vh;
+      background:linear-gradient(160deg,var(--soft) 0%,var(--bg) 40%);min-height:100vh;
       -webkit-font-smoothing:antialiased}
     .wrap{max-width:520px;margin:0 auto;padding:20px 16px 40px}
     .card{background:var(--card);border:1px solid var(--line);border-radius:22px;
-      box-shadow:0 18px 50px -24px rgba(120,70,190,.4);overflow:hidden}
+      box-shadow:0 18px 50px -24px rgba(var(--card-sh),.4);overflow:hidden}
     .hero{background:linear-gradient(120deg,var(--violet),var(--pink));color:#fff;
       padding:26px 22px 22px;text-align:center}
     .hero .badge{display:inline-block;background:rgba(255,255,255,.22);border-radius:999px;
@@ -34,9 +41,9 @@
     .svc-list{display:flex;flex-direction:column;gap:9px}
     .svc{display:flex;align-items:center;gap:12px;border:2px solid var(--line);
       border-radius:14px;padding:12px 14px;cursor:pointer;transition:.15s;background:#fff}
-    .svc:hover{border-color:#dcccf5}
+    .svc:hover{border-color:var(--svc-hover)}
     .svc input{accent-color:var(--violet);width:18px;height:18px;flex:0 0 auto}
-    .svc.on{border-color:var(--violet);background:#faf6ff;box-shadow:0 6px 18px -10px rgba(155,93,229,.6)}
+    .svc.on{border-color:var(--violet);background:var(--svc-on);box-shadow:0 6px 18px -10px rgba(var(--ring),.6)}
     .svc .n{font-weight:600;flex:1;min-width:0}
     .svc .n small{display:block;color:var(--muted);font-weight:500;font-size:12.5px;margin-top:1px}
     .svc .p{font-family:Poppins,sans-serif;color:var(--violet);font-weight:700;white-space:nowrap}
@@ -44,7 +51,7 @@
     .row2 .fld{flex:1;min-width:0}
     .input{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:12px 13px;
       font-size:16px;font-family:inherit;color:var(--ink);background:#fff;transition:.15s}
-    .input:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(155,93,229,.15)}
+    .input:focus{outline:none;border-color:var(--violet);box-shadow:0 0 0 3px rgba(var(--ring),.15)}
     textarea.input{resize:vertical;min-height:64px}
     .go{width:100%;margin-top:22px;border:none;border-radius:14px;cursor:pointer;
       background:var(--wa);color:#fff;font-weight:700;font-size:16.5px;font-family:Poppins,sans-serif;
@@ -175,6 +182,8 @@
     function boot(data){
       if(loadView) loadView.classList.add('hidden');
       formView.classList.remove('hidden');
+      // tema visual do salão (rosa padrão / azul "masc") — combina com o painel do dono
+      document.documentElement.setAttribute('data-theme', (data.theme || data.t) === 'masc' ? 'masc' : 'fem');
       var biz = data.b || 'Salão';
       var wa = data.w;
       document.getElementById('bizName').textContent = biz;
