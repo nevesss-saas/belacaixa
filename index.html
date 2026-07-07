@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260707a" />
+  <link rel="stylesheet" href="styles.css?v=20260707b" />
   <link rel="icon" href="logo-compacta.png?v=20260704e">
 </head>
 <body>
@@ -24,6 +24,10 @@
         <a href="#planos">Planos</a>
         <a href="#como">Como funciona</a>
       </nav>
+      <div class="lp-theme" id="lpTheme" title="Escolha a cor do painel: rosa ou azul">
+        <button class="tsw" data-t="fem" type="button" aria-label="Tema rosa"></button>
+        <button class="tsw" data-t="masc" type="button" aria-label="Tema azul"></button>
+      </div>
       <button class="btn btn-primary" data-enter>Entrar no painel</button>
     </header>
 
@@ -304,8 +308,8 @@
           <div class="atn-head">🎨 Antes de começar, qual tema você prefere?</div>
           <div class="atn-sub">Escolha a cor do seu painel. Você pode trocar depois nas configurações.</div>
           <div class="theme-pick" id="au_theme">
-            <div class="tp on" data-t="fem"><div class="tp-sw" style="background:linear-gradient(120deg,#f43f8e,#9b5de5)"></div><div class="tp-name">💗 Rosa</div><div class="tp-sub">Padrão</div></div>
-            <div class="tp" data-t="masc"><div class="tp-sw" style="background:linear-gradient(120deg,#2563eb,#1e3a8a)"></div><div class="tp-name">💙 Azul</div><div class="tp-sub">Neutro</div></div>
+            <div class="tp on" data-t="fem"><div class="tp-sw" style="background:linear-gradient(120deg,#f43f8e,#9b5de5)"></div><div class="tp-name"><span class="tp-dot" style="background:#f43f8e"></span>Rosa</div><div class="tp-sub">Padrão</div></div>
+            <div class="tp" data-t="masc"><div class="tp-sw" style="background:linear-gradient(120deg,#2563eb,#1e3a8a)"></div><div class="tp-name"><span class="tp-dot" style="background:#1d4ed8"></span>Azul</div><div class="tp-sub">Neutro</div></div>
           </div>
         </div>
         <div class="seg auth-tabs">
@@ -345,6 +349,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js?v=20260704c"></script>
-  <script src="app.js?v=20260707a"></script>
+  <script src="app.js?v=20260707b"></script>
 </body>
 </html>

@@ -1356,6 +1356,7 @@ function applyTheme(force) {
     const want = t === 'masc' ? img.dataset.masc : img.dataset.fem;
     if (img.getAttribute('src') !== want) img.setAttribute('src', want);
   });
+  document.querySelectorAll('.tsw[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
 }
 function render() {
   applyTheme();
@@ -2307,7 +2308,7 @@ function refreshAuthTheme() {
   applyTheme(saved);
   const box = $('#au_theme'); if (box) box.querySelectorAll('.tp').forEach(c => c.classList.toggle('on', c.dataset.t === saved));
   const note = $('#authThemeNote'); if (note) note.classList.toggle('first', !themeChosen());
-  if (!themeChosen()) toast('💗 Rosa ou 💙 Azul? Toque no tema que você prefere logo acima. ↑', 'info');
+  if (!themeChosen()) toast('Rosa ou Azul? Toque na cor que você prefere logo acima. ↑', 'info');
 }
 function setAuthMode(mode) {
   authMode = mode;
@@ -2338,7 +2339,7 @@ function wireAuth() {
     applyTheme(c.dataset.t);
     try { localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
     const note = $('#authThemeNote'); if (note) note.classList.remove('first');
-    toast('Tema ' + (c.dataset.t === 'masc' ? 'Azul 💙' : 'Rosa 💗') + ' aplicado!', 'ok');
+    toast('Tema ' + (c.dataset.t === 'masc' ? 'Azul' : 'Rosa') + ' aplicado!', 'ok');
   });
 }
 async function onAuthSubmit(e) {
@@ -2617,6 +2618,11 @@ function demoSignup() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   applyTheme(savedThemePref() || 'fem');   // reflete o tema escolhido já na landing/login
+  document.querySelectorAll('#lpTheme .tsw').forEach(b => b.onclick = () => {
+    applyTheme(b.dataset.t);
+    try { localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
+    toast('Tema ' + (b.dataset.t === 'masc' ? 'Azul' : 'Rosa') + ' aplicado!', 'ok');
+  });
   $$('[data-enter]').forEach(b => b.onclick = () => enterApp());
   $$('[data-demo]').forEach(b => b.onclick = () => enterDemo());
   $$('[data-demo-signup]').forEach(b => b.onclick = () => demoSignup());
