@@ -1345,9 +1345,13 @@ function updatePrivacyEye() {
   eye.onclick = () => { privacyUnlocked = false; render(); toast('Valores ocultados 🔒', 'info'); };
 }
 
-function applyTheme() {
-  const t = (state && state.business && state.business.theme === 'masc') ? 'masc' : 'fem';
+function applyTheme(force) {
+  const t = force || ((state && state.business && state.business.theme === 'masc') ? 'masc' : 'fem');
   document.documentElement.setAttribute('data-theme', t);
+  document.querySelectorAll('img[data-fem][data-masc]').forEach(img => {
+    const want = t === 'masc' ? img.dataset.masc : img.dataset.fem;
+    if (img.getAttribute('src') !== want) img.setAttribute('src', want);
+  });
 }
 function render() {
   applyTheme();
@@ -2196,7 +2200,7 @@ function modalBiz() {
     <button class="btn btn-danger btn-sm" id="g_reset">↺ Restaurar dados de demonstração</button>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="g_save">Salvar</button>`);
   bindPinSection();
-  $('#g_theme').querySelectorAll('.tp').forEach(c => c.onclick = () => { $('#g_theme').querySelectorAll('.tp').forEach(x => x.classList.toggle('on', x === c)); document.documentElement.setAttribute('data-theme', c.dataset.t); });
+  $('#g_theme').querySelectorAll('.tp').forEach(c => c.onclick = () => { $('#g_theme').querySelectorAll('.tp').forEach(x => x.classList.toggle('on', x === c)); applyTheme(c.dataset.t); });
   $('#g_days').querySelectorAll('button[data-d]').forEach(btn => btn.onclick = () => { btn.classList.toggle('btn-primary'); btn.classList.toggle('btn-ghost'); });
   // almoço: liga/desliga a caixa, alterna "dias específicos", e chips clicáveis
   const lunchBox = $('#g_lunch_box'), lunchDaysRow = $('#g_lunch_days'), lunchScope = $('#g_lunch_scope');
