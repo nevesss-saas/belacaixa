@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Agende seu horário 💅</title>
+  <title>Agende seu horário 📅</title>
   <meta name="description" content="Escolha serviço, dia e horário — seu pedido chega direto no WhatsApp do salão." />
   <meta name="robots" content="noindex" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💅</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
   <style>
     :root{
       --violet:#9b5de5; --pink:#f43f8e; --ink:#2b2540; --muted:#8b849b;
@@ -83,7 +83,7 @@
       <!-- formulário -->
       <div id="formView" class="hidden">
         <div class="hero">
-          <span class="badge">💅 Agendamento online</span>
+          <span class="badge">📅 Agendamento online</span>
           <h1 id="bizName">Salão</h1>
           <p>Escolha o serviço, o dia e o horário</p>
         </div>
@@ -178,7 +178,7 @@
       var biz = data.b || 'Salão';
       var wa = data.w;
       document.getElementById('bizName').textContent = biz;
-      document.title = 'Agende na ' + biz + ' 💅';
+      document.title = 'Agende na ' + biz + ' 📅';
 
       // expediente do salão (com padrões) — só oferecemos horários dentro dele
       var oh = data.oh || { open:'09:00', close:'19:00', days:[1,2,3,4,5,6], slot:30 };
@@ -287,7 +287,7 @@
       var fallbackLink = document.getElementById('fallbackLink');
 
       function openWa(svc, date, time, name, phone, note){
-        var msg = 'Oi! Reservei um horário 💅\n\n' +
+        var msg = 'Oi! Reservei um horário 📅\n\n' +
           '• Serviço: ' + svc[0] + ' — ' + money(svc[1]) + '\n' +
           '• Data: ' + brDate(date) + '\n' +
           '• Horário: ' + time + '\n' +
@@ -307,7 +307,7 @@
         var phone = document.getElementById('fPhone').value.trim();
         var note = document.getElementById('fNote').value.trim();
 
-        if(!svc){ alert('Escolha um serviço 💅'); return; }
+        if(!svc){ alert('Escolha um serviço 📅'); return; }
         if(!date){ alert('Escolha o dia.'); return; }
         if(!isOpenDay(date)){ alert('O salão não atende nesse dia 😴\nEscolha outro, por favor 💜'); return; }
         if(!time){ alert('Escolha um horário disponível na lista 🕗'); return; }
