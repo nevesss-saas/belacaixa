@@ -1162,11 +1162,13 @@ function pipeCard(c, kind) {
   if (kind === 'active') {
     actions = ib('edit', 'ib-edit', '✏️', 'Editar plano/validade') + ib('revoke', 'ib-danger', '🚫', 'Revogar acesso');
   } else if (kind === 'inactive') {
-    // inativo: liberar acesso, editar ou EXCLUIR o cliente por completo (some do pipeline)
-    actions = ib('activate', 'ib-ok', '✅', 'Liberar acesso') + ib('edit', 'ib-edit', '✏️', 'Editar') + ib('purge', 'ib-danger', '🗑️', 'Excluir cliente (apaga conta e dados)');
+    // inativo (inclui teste expirado): liberar, editar, REVOGAR (corta e mantém cortado)
+    // ou EXCLUIR o cliente por completo (some do pipeline)
+    actions = ib('activate', 'ib-ok', '✅', 'Liberar acesso') + ib('edit', 'ib-edit', '✏️', 'Editar') + ib('revoke', 'ib-ghost', '🚫', 'Revogar acesso') + ib('purge', 'ib-danger', '🗑️', 'Excluir cliente (apaga conta e dados)');
   } else {
+    // em teste (24h): agora também dá pra REVOGAR o acesso na hora (corta o teste)
     const canDel = c.status && c.status !== 'sem assinatura';
-    actions = ib('activate', 'ib-ok', '✅', 'Liberar acesso') + ib('edit', 'ib-edit', '✏️', 'Editar') + (canDel ? ib('delete', 'ib-ghost', '🗑️', 'Excluir assinatura') : '');
+    actions = ib('activate', 'ib-ok', '✅', 'Liberar acesso') + ib('edit', 'ib-edit', '✏️', 'Editar') + ib('revoke', 'ib-danger', '🚫', 'Revogar acesso (corta o teste)') + (canDel ? ib('delete', 'ib-ghost', '🗑️', 'Excluir assinatura') : '');
   }
   return `<div class="pipe-card">
     <div class="pipe-card-top"><b>${nome}</b>${statusDot(c)}</div>
@@ -2452,7 +2454,10 @@ function trialInfo() {
   const msLeft = start + TRIAL_MS - Date.now();
   return { msLeft, active: msLeft > 0, hoursLeft: Math.max(1, Math.ceil(msLeft / 3600000)) };
 }
-function trialActive() { const t = trialInfo(); return !!(t && t.active); }
+// Acesso revogado pelo dono no painel (assinatura marcada como 'canceled') corta
+// TAMBÉM o teste grátis — senão quem ainda está dentro das 24h continuaria entrando.
+function accessRevoked() { return !!(subInfo && subInfo.status === 'canceled'); }
+function trialActive() { const t = trialInfo(); return !!(t && t.active) && !accessRevoked(); }
 function hasAccess() { return subActive() || trialActive(); }
 /* --- Agendamento automático (link + reserva na hora) é exclusivo do GOLD.
    Cortesia de lançamento para as primeiras contas até 03/08/2026 (interna, sem anúncio na UI). --- */
