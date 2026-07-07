@@ -875,7 +875,16 @@ VIEWS.agenda = {
     up.forEach(a => (byDate[a.date] = byDate[a.date] || []).push(a));
     const concluded = state.appointments.filter(a => a.status === 'concluido').length;
     const nextSlot = suggestSlot();
+    // aviso do SILVER: agendamento automático liberado só no 1º mês, contando os dias
+    const sa = silverAgendaInfo();
+    let silverBanner = '';
+    if (sa && sa.active) {
+      silverBanner = `<div class="venc-bar tone-amber" style="margin-bottom:12px"><span>📅 <b>Agendamento automático liberado no seu SILVER</b> — dia ${sa.dayNum} de ${SILVER_AGENDA_DAYS}${sa.daysLeft > 0 ? ` · faltam ${sa.daysLeft} dia(s); depois disso, só no GOLD.` : ` · é o último dia! Depois, só no GOLD.`}</span><button class="btn btn-soft btn-sm" data-act="go-gold" style="margin-left:auto">Virar GOLD</button></div>`;
+    } else if (silverActive()) {
+      silverBanner = `<div class="venc-bar tone-amber" style="margin-bottom:12px"><span>🔒 <b>Seu mês de agendamento automático no SILVER terminou.</b> Pra continuar recebendo agendamentos pelo WhatsApp, mude para o GOLD.</span><button class="btn btn-soft btn-sm" data-act="go-gold" style="margin-left:auto">Virar GOLD</button></div>`;
+    }
     return `
+    ${silverBanner}
     <div class="section-head">
       <div class="grid cols-3" style="flex:1;max-width:560px">
         ${miniStat('📅', 'Agendados', up.length)}
@@ -2326,6 +2335,7 @@ const ACTIONS = {
   'go-clientes': () => { closeModal(); setView('clientes'); },
   'central-avisos': () => modalCentralAvisos(),
   'assinar': () => showSubGate(),
+  'go-gold': () => modalGoldAgenda(),
   'repor-item': (id) => modalRepor(id),
   'edit-item': (id) => modalItem(id),
   'del-item': (id) => { const it = state.inventory.find(i => i.id === id); if (it && confirm('Excluir "' + it.name + '" do estoque?')) { state.inventory = state.inventory.filter(i => i.id !== id); save(); render(); toast('Item removido do estoque.', 'info'); } },
@@ -2482,9 +2492,29 @@ function hasAccess() { return subActive() || trialActive(); }
 const AUTO_AGENDA_EARLY = ['c81920e0-9b26-438e-9cc6-f33e123b8094', '3a3adca8-c0fa-4b00-bf70-c38c497d8d3d', 'd737472f-8dff-4751-9945-ad724c1ba401'];
 const AUTO_AGENDA_EARLY_UNTIL = '2026-08-03';
 function goldActive() { return subActive() && /^gold/.test(String((subInfo && subInfo.plan) || '')); }
+function silverActive() { return subActive() && /^silver/.test(String((subInfo && subInfo.plan) || '')); }
+/* SILVER ganha o agendamento automático (recurso do GOLD) só no 1º mês — 30 dias
+   contados a partir de quando o SILVER começou (state.business.silverSince). Depois
+   disso, só voltando pro GOLD. */
+const SILVER_AGENDA_DAYS = 30;
+function silverAgendaInfo() {
+  if (!silverActive()) return null;
+  const since = state && state.business && state.business.silverSince;
+  const start = since ? new Date(since).getTime() : Date.now();   // ainda não marcado = começa hoje
+  const elapsed = isNaN(start) ? 0 : Math.floor((Date.now() - start) / 86400000);
+  const dayNum = Math.min(SILVER_AGENDA_DAYS, elapsed + 1);        // "dia X de 30"
+  return { dayNum, daysLeft: Math.max(0, SILVER_AGENDA_DAYS - dayNum), active: elapsed < SILVER_AGENDA_DAYS };
+}
+// grava o início do SILVER na 1ª vez que detectamos o plano ativo (fonte da verdade dos 30 dias)
+function markSilverSince() {
+  if (!state || !state.business) return;
+  if (silverActive() && !state.business.silverSince) { state.business.silverSince = new Date().toISOString(); save(); }
+}
 function autoAgendaOk() {
   if (demoMode || isAdmin() || goldActive()) return true;
-  return !!(currentUser && AUTO_AGENDA_EARLY.includes(currentUser.id) && todayISO() < AUTO_AGENDA_EARLY_UNTIL);
+  if (currentUser && AUTO_AGENDA_EARLY.includes(currentUser.id) && todayISO() < AUTO_AGENDA_EARLY_UNTIL) return true;
+  const sa = silverAgendaInfo();                 // SILVER: liberado no 1º mês (30 dias)
+  return !!(sa && sa.active);
 }
 /* Upsell do GOLD — aparece sempre que alguém sem o plano tenta usar a agenda automática */
 function modalGoldAgenda() {
@@ -2644,6 +2674,7 @@ async function enterApp() {
   if (!state) { $('#viewRoot').innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Carregando seus dados…</div>'; await cloudLoad(); }
   if (purgeExpiredHolds()) save();   // limpa pedidos do link que expiraram (24h sem você tratar)
   await loadSubscription();
+  markSilverSince();   // 1ª vez que vemos o SILVER ativo, grava a data de início dos 30 dias
   const params = new URLSearchParams(location.search);
   if (params.get('assinatura') === 'sucesso' && !subActive()) { $('#viewRoot').innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Confirmando seu pagamento…</div>'; await pollSub(8); }
   if (params.get('assinatura')) { const ok = params.get('assinatura') === 'sucesso' && subActive(); history.replaceState({}, '', location.pathname); if (ok) toast('Assinatura ativada! 🎉', 'ok'); }
