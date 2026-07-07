@@ -653,6 +653,14 @@ function toast(msg, type = 'info', dur = 3200, action = null) {
   $('#toastRoot').appendChild(el);
   setTimeout(kill, dur);
 }
+// Ícone da marca (monograma BelaCaixa) que SEGUE O TEMA (rosa/azul). Usado no lugar
+// do emoji de unha 💅. Os data-fem/data-masc deixam o applyTheme trocar a cor ao vivo.
+function brandIco(px) {
+  px = px || 40;
+  const fem = 'logo-icon.png?v=20260706g', masc = 'logo-icon-masc.png?v=20260706i';
+  const cur = (document.documentElement.dataset.theme === 'masc') ? masc : fem;
+  return `<img class="brand-ico" src="${cur}" data-fem="${fem}" data-masc="${masc}" alt="BelaCaixa" style="width:${px}px;height:${px}px;object-fit:contain;display:inline-block;vertical-align:middle">`;
+}
 function openModal(title, body, foot) {
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-close-bg>
     <div class="modal"><div class="modal-head"><h3>${title}</h3><button class="modal-x" data-close>×</button></div>
@@ -920,7 +928,7 @@ function apptRow(a) {
         <button class="modal-x" data-act="cancel-appt" data-id="${a.id}" title="Recusar">×</button>
       </div></div>`;
   }
-  const msgConfirmar = `Oi ${first}! 💅 Passando pra confirmar seu horário na ${biz}: ${a.serviceName} no dia ${dataBR} às ${a.time}. Posso confirmar? 😊`;
+  const msgConfirmar = `Oi ${first}! ✨ Passando pra confirmar seu horário na ${biz}: ${a.serviceName} no dia ${dataBR} às ${a.time}. Posso confirmar? 😊`;
   const msgLembrar = `Oi ${first}! 💜 Lembrete do seu horário na ${biz}: ${a.serviceName} dia ${dataBR} às ${a.time}. Te espero! ✨`;
   const noTel = phone ? '' : ' title="Cliente sem telefone — o WhatsApp vai abrir pra você escolher o contato"';
   return `<div class="row between appt-row" style="padding:12px 0;border-bottom:1px dashed var(--line)">
@@ -1117,7 +1125,7 @@ VIEWS.servicos = {
         <div><h2>Seus serviços</h2><span class="sh-sub">${list.length} serviço(s) cadastrado(s)</span></div>
         <button class="btn btn-primary" data-act="new-servico">＋ Adicionar serviço</button>
       </div>
-      <div class="svc-list">${cards || '<div class="empty"><span class="e-ico">💅</span>Nenhum serviço ainda. Clique em “Adicionar serviço” pra começar.</div>'}</div>`;
+      <div class="svc-list">${cards || `<div class="empty"><span class="e-ico">${brandIco(46)}</span>Nenhum serviço ainda. Clique em “Adicionar serviço” pra começar.</div>`}</div>`;
   }
 };
 
@@ -1550,7 +1558,7 @@ function modalServico(id) {
   const inv = state.inventory || [];
   let mats = s && Array.isArray(s.mat) ? s.mat.map(m => [m[0], m[1]]) : [];   // cópia editável da receita
   const invOpts = sel => inv.map(i => `<option value="${i.id}" ${i.id === sel ? 'selected' : ''}>${esc(i.name)}${i.unit ? ' (' + esc(i.unit) + ')' : ''}</option>`).join('');
-  openModal(s ? '✏️ Editar serviço' : '💅 Novo serviço', `
+  openModal(s ? '✏️ Editar serviço' : `${brandIco(22)} Novo serviço`, `
     <div class="field"><label>Nome do serviço</label><input class="input" id="sv_name" placeholder="Ex.: Alongamento em gel" value="${s ? esc(s.name) : ''}"/></div>
     <div class="field-row">
       <div class="field"><label>Valor (R$)</label><input class="input" id="sv_price" type="number" step="0.01" min="0" value="${s ? s.price : ''}" placeholder="0,00"/></div>
@@ -1593,7 +1601,7 @@ function modalServico(id) {
     const cleanMats = mats.filter(m => m[0] && m[1] > 0).map(m => [m[0], +(+m[1]).toFixed(2)]);
     if (s) { s.name = name; s.price = price; s.dur = dur > 0 ? dur : (s.dur || 0); s.mat = cleanMats; }
     else { state.services.push({ id: 's_' + uid(), name, price, dur: dur > 0 ? dur : 60, mat: cleanMats }); }
-    save(); closeModal(); render(); toast(s ? 'Serviço atualizado ✨' : 'Serviço adicionado 💅', 'ok');
+    save(); closeModal(); render(); toast(s ? 'Serviço atualizado ✨' : 'Serviço adicionado ✨', 'ok');
   };
 }
 function modalTx(type, editId) {
@@ -2075,7 +2083,7 @@ function modalLinkAgendamento() {
     return;
   }
   const link = bookingLink();
-  const share = `Oi! 💅 Agende seu horário na ${state.business.name} por aqui, é rapidinho: ${link}`;
+  const share = `Oi! ✨ Agende seu horário na ${state.business.name} por aqui, é rapidinho: ${link}`;
   openModal('🔗 Seu link de agendamento', `
     <p>Coloque esse link no seu <b>Instagram</b>, status do WhatsApp ou mande pras clientes. Elas escolhem serviço, dia e horário, e o pedido chega direto no seu WhatsApp <b>${fmtWa(wa)}</b> — você confirma e agenda. 😊</p>
     <div class="field"><label>Seu link</label><input class="input" id="lk_url" readonly value="${esc(link)}" onclick="this.select()"/></div>
