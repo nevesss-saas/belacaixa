@@ -657,8 +657,25 @@ function openModal(title, body, foot) {
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-close-bg>
     <div class="modal"><div class="modal-head"><h3>${title}</h3><button class="modal-x" data-close>×</button></div>
     <div class="modal-body">${body}</div>${foot ? `<div class="modal-foot">${foot}</div>` : ''}</div></div>`;
+  hardenModalInputs($('#modalRoot'));
   $('[data-close-bg]').addEventListener('click', e => { if (e.target.matches('[data-close-bg]')) closeModal(); });
   $('[data-close]').addEventListener('click', closeModal);
+}
+// PRIVACIDADE ENTRE CONTAS: impede o autofill do navegador de sugerir/preencher
+// nesses campos valores que o dono digitou em OUTRA conta no mesmo aparelho.
+// Isso NÃO é dado do servidor (o banco isola por RLS) — é a memória de formulário
+// do próprio navegador. As sugestões corretas do app usam <datalist>, que continua
+// funcionando normalmente com autocomplete desligado.
+function hardenModalInputs(root) {
+  if (!root) return;
+  root.querySelectorAll('input, textarea, select').forEach(el => {
+    if (el.type === 'password') return;             // senha/PIN cuidam do próprio autocomplete
+    if (!el.hasAttribute('autocomplete')) el.setAttribute('autocomplete', 'off');
+    // token aleatório + name único derrotam a heurística do Chrome que ignora "off" em campos de nome
+    if (!el.getAttribute('name')) el.setAttribute('name', 'f_' + Math.random().toString(36).slice(2, 9));
+    el.setAttribute('data-lpignore', 'true');       // pede pro LastPass/1Password não injetar
+    el.setAttribute('data-form-type', 'other');
+  });
 }
 function closeModal() { $('#modalRoot').innerHTML = ''; }
 
