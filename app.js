@@ -162,12 +162,25 @@ function unsubscribeTenantRealtime() {
   if (rtChannel && sb) { try { sb.removeChannel(rtChannel); } catch (e) {} }
   rtChannel = null;
 }
-// estado inicial de uma conta nova: modelos prontos, dados operacionais zerados
+// estado inicial de uma conta NOVA: 100% zerado, pronto para o dono preencher.
+// NADA de demonstração — sem serviços, estoque, clientes, caixa, agenda, bens nem
+// investimentos. Só ficam os padrões estruturais (fuso, expediente e o tema escolhido
+// antes de logar) pra o app funcionar já na primeira tela.
 function starterState() {
-  const s = seed();
-  s.clients = []; s.transactions = []; s.appointments = []; s.assets = []; s.investments = []; s.chat = [];
-  s.business.name = 'Meu Negócio';
-  return s;
+  return {
+    v: 1,
+    business: {
+      name: 'Meu Negócio',
+      theme: (typeof savedThemePref === 'function' && savedThemePref()) || 'fem',
+      timezone: DEFAULT_TZ,
+      reserveTarget: 0,
+      monthlyGoal: 0,
+      hours: { open: '09:00', close: '19:00', days: [1, 2, 3, 4, 5, 6], slot: 30 },
+    },
+    security: { pinHash: '' },
+    clients: [], services: [], inventory: [], transactions: [],
+    appointments: [], assets: [], investments: [], patHist: [], chat: [],
+  };
 }
 
 /* ============================================================
@@ -541,8 +554,10 @@ function assistantReply(qRaw) {
     return `Hoje você tem <b>${t.length}</b> atendimento(s):<ul>${t.map(a => `<li>${a.time} — ${esc(a.clientName)} (${esc(a.serviceName)}, ${fmt(a.price)})</li>`).join('')}</ul>`;
   }
   if (has('meta', 'objetivo', 'faturamento')) {
-    const pct = Math.round(cur.in / state.business.monthlyGoal * 100);
-    return `Sua meta é faturar <b>${fmt(state.business.monthlyGoal)}</b>/mês. Você já está em <b>${fmt(cur.in)}</b> (${pct}%). ${pct >= 100 ? 'Meta batida! 🎉' : `Faltam ${fmt(state.business.monthlyGoal - cur.in)} — cerca de ${Math.ceil((state.business.monthlyGoal - cur.in) / 60)} atendimentos.`}`;
+    const g = state.business.monthlyGoal;
+    if (!g) return 'Você ainda não definiu sua meta de faturamento mensal. Toque em <b>Configurações do negócio</b> pra definir — aí eu acompanho seu progresso com você. 🎯';
+    const pct = Math.round(cur.in / g * 100);
+    return `Sua meta é faturar <b>${fmt(g)}</b>/mês. Você já está em <b>${fmt(cur.in)}</b> (${pct}%). ${pct >= 100 ? 'Meta batida! 🎉' : `Faltam ${fmt(g - cur.in)} — cerca de ${Math.ceil((g - cur.in) / 60)} atendimentos.`}`;
   }
   if (has('oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'ajuda', 'pode')) {
     return 'Oi! 💖 Sou a sua assistente BelaCaixa. Posso te dizer como está seu <b>lucro</b>, seu <b>caixa</b>, o que <b>comprar</b>, onde <b>investir</b>, suas <b>clientes</b> e sua <b>agenda</b>. É só perguntar!';
