@@ -1415,6 +1415,9 @@ function applyTheme(force) {
     if (el.textContent !== want) el.textContent = want;
   });
   document.querySelectorAll('.tsw[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  // PWA: a cor da barra do sistema (app instalado) acompanha o tema rosa/azul
+  const tc = document.querySelector('meta[name="theme-color"]');
+  if (tc) tc.setAttribute('content', t === 'masc' ? '#1d4ed8' : '#f43f8e');
 }
 // Termo do negócio conforme o tema. Passa o texto feminino (rosé, "salão") e o
 // masculino (azul, "barbearia") já com o artigo certo — "salão" é masculino e
