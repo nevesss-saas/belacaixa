@@ -1,7 +1,12 @@
-﻿Identidade visual (tema+ramo) só na conta do admin
+﻿Autofill do navegador não vaza dados entre contas (multi-tenant)
 
-Ajuste: gate passou de (isAdmin || demoMode) para só isAdmin.
-Assim a demo publica mostra a visão do cliente (sem tema/ramo),
-e o dono consegue conferir como fica para o cliente pela demo.
+Campos de texto dos modais (nome de cliente na Agenda, nome do
+serviço no Catálogo) nasciam com id/label fixos, e o Chrome ignorava
+o autocomplete=off e sugeria valores digitados em OUTRAS contas do
+mesmo aparelho — parecia dado de outro tenant. Reforço no
+hardenModalInputs: truque readonly-até-o-1º-toque nos campos de texto,
+que impede o Chrome de registrar o campo p/ autofill. As sugestões do
+app (<datalist>) continuam vindo só de state.clients/state.services
+da conta logada (isolado por RLS no servidor).
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>

@@ -683,6 +683,18 @@ function hardenModalInputs(root) {
     if (!el.getAttribute('name')) el.setAttribute('name', 'f_' + Math.random().toString(36).slice(2, 9));
     el.setAttribute('data-lpignore', 'true');       // pede pro LastPass/1Password não injetar
     el.setAttribute('data-form-type', 'other');
+    // Campos de TEXTO (nome de cliente/serviço) são os que o Chrome insiste em autopreencher com
+    // o que foi digitado em OUTRAS contas no mesmo aparelho — parece "dado de outro tenant", mas é
+    // só a memória de formulário do navegador. Truque readonly-até-o-1º-toque: o campo nasce readonly
+    // (assim o Chrome NÃO o registra pra autofill) e é liberado quando o usuário foca/toca. As
+    // sugestões do próprio app (<datalist> = só os dados DESTA conta) continuam funcionando normal.
+    const isText = el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && ['text', 'search', ''].includes(el.getAttribute('type') || 'text'));
+    if (isText) {
+      el.readOnly = true;
+      const unlock = () => { el.readOnly = false; };
+      el.addEventListener('focus', unlock, { once: true });
+      el.addEventListener('pointerdown', unlock, { once: true });
+    }
   });
 }
 function closeModal() { $('#modalRoot').innerHTML = ''; }
