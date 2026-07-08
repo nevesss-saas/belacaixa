@@ -2401,9 +2401,9 @@ function modalBiz() {
     ['America/Rio_Branco', 'Acre (UTC−5) — AC e oeste do AM'],
     ['America/Noronha', 'Fernando de Noronha (UTC−2)'],
   ];
-  // Ramo + tema (identidade visual) só aparecem pra admin/demo (apresentação).
-  // Conta comum já escolheu o ramo/cor no cadastro, então o painel fica travado nisso.
-  const showIdent = isAdmin() || demoMode;
+  // Ramo + tema (identidade visual) só aparecem pra conta do ADMIN (apresentação).
+  // Conta comum já escolheu o ramo/cor no cadastro; a demo mostra a visão do cliente (sem esses campos).
+  const showIdent = isAdmin();
   const identFields = showIdent ? `
     <div class="field"><label>🏷️ Ramo do negócio <span class="muted" style="font-weight:400">(adapta os textos e a página de agendamento ao seu segmento)</span></label>
       <select class="input" id="g_seg">${SEGMENT_ORDER.map(k => `<option value="${k}"${segmentKey() === k ? ' selected' : ''}>${SEGMENTS[k].icon} ${SEGMENTS[k].label}</option>`).join('')}</select>

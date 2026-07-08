@@ -1,8 +1,7 @@
-﻿Tema/ramo (identidade visual) só para admin/demo nas Configurações
+﻿Identidade visual (tema+ramo) só na conta do admin
 
-Conta comum já escolhe o ramo e a cor no cadastro, então o seletor
-"Tema do painel" e o "Ramo do negócio" somem do modal de Configurações
-para usuários comuns (ficam só para admin/demo, para apresentação).
-O save preserva o tema/segmento quando o seletor está oculto.
+Ajuste: gate passou de (isAdmin || demoMode) para só isAdmin.
+Assim a demo publica mostra a visão do cliente (sem tema/ramo),
+e o dono consegue conferir como fica para o cliente pela demo.
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
