@@ -657,10 +657,9 @@ function toast(msg, type = 'info', dur = 3200, action = null) {
 // do emoji de unha 💅. Os data-fem/data-masc deixam o applyTheme trocar a cor ao vivo.
 function brandIco(px) {
   px = px || 40;
-  const fem = 'logo-icon.png?v=20260706g', masc = 'logo-icon-masc.png?v=20260706i', pet = 'logo-icon-pet.png?v=20260708a';
-  const th = document.documentElement.dataset.theme;
-  const cur = th === 'masc' ? masc : (th === 'pet' ? pet : fem);
-  return `<img class="brand-ico" src="${cur}" data-fem="${fem}" data-masc="${masc}" data-pet="${pet}" alt="BelaCaixa" style="width:${px}px;height:${px}px;object-fit:contain;display:inline-block;vertical-align:middle">`;
+  const v = { fem: 'logo-icon.png?v=20260706g', masc: 'logo-icon-masc.png?v=20260706i', pet: 'logo-icon-pet.png?v=20260708a', ink: 'logo-icon-ink.png?v=20260708c' };
+  const cur = v[document.documentElement.dataset.theme] || v.fem;
+  return `<img class="brand-ico" src="${cur}" data-fem="${v.fem}" data-masc="${v.masc}" data-pet="${v.pet}" data-ink="${v.ink}" alt="BelaCaixa" style="width:${px}px;height:${px}px;object-fit:contain;display:inline-block;vertical-align:middle">`;
 }
 function openModal(title, body, foot) {
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-close-bg>
@@ -1402,8 +1401,8 @@ function updatePrivacyEye() {
 }
 
 const THEME_KEY = 'belacaixa_theme', THEME_CHOSEN_KEY = 'belacaixa_theme_chosen';
-const VALID_THEMES = ['fem', 'masc', 'pet'];   // rosa / azul / verde
-const THEME_COLOR = { fem: '#f43f8e', masc: '#1d4ed8', pet: '#16a34a' };
+const VALID_THEMES = ['fem', 'masc', 'pet', 'ink'];   // rosa / azul / verde / preto
+const THEME_COLOR = { fem: '#f43f8e', masc: '#1d4ed8', pet: '#16a34a', ink: '#111827' };
 function savedThemePref() { try { const t = localStorage.getItem(THEME_KEY); return VALID_THEMES.includes(t) ? t : null; } catch (e) { return null; } }
 function themeChosen() { try { return !!localStorage.getItem(THEME_CHOSEN_KEY); } catch (e) { return false; } }
 function applyTheme(force) {
@@ -1411,15 +1410,21 @@ function applyTheme(force) {
   if (!VALID_THEMES.includes(t)) t = 'fem';
   document.documentElement.setAttribute('data-theme', t);
   try { localStorage.setItem(THEME_KEY, t); if (!force) localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
-  // logo conforme a cor: rosa (data-fem) / azul (data-masc) / verde (data-pet, cai no fem se faltar)
+  // logo conforme a cor: rosa (data-fem) / azul (data-masc) / verde (data-pet) / preto (data-ink);
+  // cai no data-fem se a variante da cor não existir
   document.querySelectorAll('img[data-fem][data-masc]').forEach(img => {
-    const want = t === 'masc' ? img.dataset.masc : (t === 'pet' ? (img.dataset.pet || img.dataset.fem) : img.dataset.fem);
+    const want = img.dataset[t] || img.dataset.fem;
     if (img.getAttribute('src') !== want) img.setAttribute('src', want);
   });
-  // termo do negócio conforme o SEGMENTO (salão/barbearia/petshop) — independente da cor
+  // termo do negócio (in-app) conforme o SEGMENTO — escalável por kind, independente da cor
+  document.querySelectorAll('[data-seg-term]').forEach(el => {
+    const want = segWord(el.dataset.segTerm);
+    if (want && el.textContent !== want) el.textContent = want;
+  });
+  // spans FIXOS da landing (pré-login, sem segmento): trocam salão↔barbearia pela cor
   const _seg = segmentKey();
   document.querySelectorAll('[data-term-fem][data-term-masc]').forEach(el => {
-    const want = _seg === 'barbearia' ? el.dataset.termMasc : (_seg === 'petshop' ? (el.dataset.termPet || el.dataset.termFem) : el.dataset.termFem);
+    const want = _seg === 'barbearia' ? el.dataset.termMasc : el.dataset.termFem;
     if (el.textContent !== want) el.textContent = want;
   });
   document.querySelectorAll('.tsw[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
@@ -1435,6 +1440,7 @@ const SEGMENTS = {
     key: 'salao', label: 'Salão · Nails · Sobrancelha', icon: '💅', theme: 'fem', color: '#f43f8e',
     svg: '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><rect x="9.2" y="2" width="5.6" height="3.2" rx="1" fill="#f43f8e"/><rect x="8.4" y="5.4" width="7.2" height="3.6" rx="1" fill="#f9a8cf"/><path d="M8.2 9h7.6a1 1 0 0 1 1 1v9.5A1.5 1.5 0 0 1 15.3 21H8.7a1.5 1.5 0 0 1-1.5-1.5V10a1 1 0 0 1 1-1z" fill="#f43f8e"/><rect x="8.9" y="12.4" width="6.2" height="3.4" rx="1" fill="#fff" opacity=".5"/></svg>',
     defName: 'Meu salão', bare: 'salão', namePh: 'Ex.: Studio Bella Unhas',
+    terms: { the: 'do salão', poss: 'seu salão' },
     catalog: [
       { name: 'Corte feminino', price: 70, dur: 60 },
       { name: 'Escova', price: 50, dur: 45 },
@@ -1447,6 +1453,7 @@ const SEGMENTS = {
     key: 'barbearia', label: 'Barbearia', icon: '💈', theme: 'masc', color: '#1d4ed8',
     svg: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#1d4ed8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>',
     defName: 'Minha barbearia', bare: 'barbearia', namePh: 'Ex.: Barbearia do João',
+    terms: { the: 'da barbearia', poss: 'sua barbearia' },
     catalog: [
       { name: 'Corte masculino', price: 45, dur: 40 },
       { name: 'Barba', price: 35, dur: 30 },
@@ -1459,6 +1466,7 @@ const SEGMENTS = {
     key: 'petshop', label: 'Petshop · Banho e tosa', icon: '🐾', theme: 'pet', color: '#16a34a',
     svg: '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="#16a34a"><ellipse cx="6" cy="11" rx="2.1" ry="2.7"/><ellipse cx="18" cy="11" rx="2.1" ry="2.7"/><ellipse cx="9.6" cy="6.7" rx="2" ry="2.6"/><ellipse cx="14.4" cy="6.7" rx="2" ry="2.6"/><path d="M12 12.4c-2.7 0-5 1.9-5 4.2 0 1.8 1.5 2.8 3.1 2.8 .95 0 1.4-.35 1.9-.35s.95 .35 1.9 .35c1.6 0 3.1-1 3.1-2.8 0-2.3-2.3-4.2-5-4.2z"/></svg>',
     defName: 'Meu petshop', bare: 'petshop', namePh: 'Ex.: Pet Amore Banho e Tosa',
+    terms: { the: 'do petshop', poss: 'seu petshop' },
     catalog: [
       { name: 'Banho (porte pequeno)', price: 50, dur: 60 },
       { name: 'Banho (porte grande)', price: 80, dur: 90 },
@@ -1468,8 +1476,21 @@ const SEGMENTS = {
       { name: 'Corte de unhas', price: 25, dur: 20 },
     ],
   },
+  tattoo: {
+    key: 'tattoo', label: 'Tatuagem · Ink · Piercing', icon: '🖤', theme: 'ink', color: '#111827',
+    svg: '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="#111827"><path d="M12 2.4c-.42 0-.8.22-1.01.58C9.17 6.1 5.3 10.4 5.3 14.4a6.7 6.7 0 0 0 13.4 0c0-4-3.87-8.3-5.69-11.42A1.16 1.16 0 0 0 12 2.4z"/><circle cx="12" cy="14.6" r="2.3" fill="#fff" opacity=".28"/></svg>',
+    defName: 'Meu estúdio', bare: 'estúdio', namePh: 'Ex.: Black Rose Tattoo Studio',
+    terms: { the: 'do estúdio', poss: 'seu estúdio' },
+    catalog: [
+      { name: 'Tatuagem pequena', price: 200, dur: 60 },
+      { name: 'Tatuagem média', price: 450, dur: 120 },
+      { name: 'Tatuagem grande (sessão)', price: 800, dur: 240 },
+      { name: 'Piercing', price: 120, dur: 30 },
+      { name: 'Retoque', price: 100, dur: 45 },
+    ],
+  },
 };
-const SEGMENT_ORDER = ['salao', 'barbearia', 'petshop'];
+const SEGMENT_ORDER = ['salao', 'barbearia', 'petshop', 'tattoo'];
 // Segmento atual. Contas com `segment` gravado usam ele; contas antigas/landing
 // (sem segment) caem no fallback pela cor (azul=barbearia, rosa=salão) — assim nada
 // muda pra quem já usava e a landing pré-login continua igual.
@@ -1481,13 +1502,17 @@ function segmentKey() {
   return masc ? 'barbearia' : 'salao';
 }
 function curSegment() { return SEGMENTS[segmentKey()]; }
-// Termo do negócio conforme o SEGMENTO. Passa o texto de cada ramo (salão / barbearia
-// / petshop) já com o artigo certo. `pet` é opcional (cai no `fem` se não vier).
+// Termo do negócio conforme o SEGMENTO, ESCALÁVEL por tipo de palavra (kind):
+//   term('the')  → "do salão" / "da barbearia" / "do petshop" / "do estúdio"
+//   term('poss') → "seu salão" / "sua barbearia" / "seu petshop" / "seu estúdio"
+// Cada ramo define seu `terms` em SEGMENTS. Adicionar um novo ramo NÃO exige mexer aqui.
 // Retorna um <span> que o applyTheme mantém sincronizado quando o segmento muda.
-function term(fem, masc, pet) {
-  const seg = segmentKey();
-  const cur = seg === 'barbearia' ? masc : (seg === 'petshop' ? (pet || fem) : fem);
-  return `<span data-term-fem="${fem}" data-term-masc="${masc}"${pet ? ` data-term-pet="${pet}"` : ''}>${cur}</span>`;
+function segWord(kind) {
+  const s = curSegment();
+  return (s.terms && s.terms[kind]) || (SEGMENTS.salao.terms && SEGMENTS.salao.terms[kind]) || '';
+}
+function term(kind) {
+  return `<span data-seg-term="${kind}">${segWord(kind)}</span>`;
 }
 // versão texto-puro (sem HTML) p/ nome padrão de negócio embutido em links/tokens
 function bizWordPlain(cap) {
@@ -1545,7 +1570,7 @@ function notifBarHTML() {
   const resumo = Object.entries(porGrupo).map(([g, n]) => `${g}: <b>${n}</b>`).join(' · ');
   return `<div class="notif-bar" id="notifBar">
     <span style="font-size:24px">🔔</span>
-    <div style="flex:1;min-width:0"><b>${un.length} aviso(s) novo(s) no ${term('seu salão', 'sua barbearia', 'seu petshop')}</b>
+    <div style="flex:1;min-width:0"><b>${un.length} aviso(s) novo(s) no ${term('poss')}</b>
       <div class="muted" style="font-size:13px;margin-top:2px">${resumo}</div></div>
     <button class="btn btn-primary btn-sm" data-act="central-avisos">Ver avisos →</button>
   </div>`;
@@ -2244,7 +2269,7 @@ function bookingLink() {
 function modalLinkAgendamento() {
   const wa = waPhone(state.business && state.business.whatsapp);
   if (!wa) {
-    openModal('🔗 Link de agendamento', `<p>Pra gerar seu link, cadastre primeiro o <b>WhatsApp ${term('do salão', 'da barbearia', 'do petshop')}</b> — é pra lá que as clientes vão mandar os pedidos de horário.</p>`,
+    openModal('🔗 Link de agendamento', `<p>Pra gerar seu link, cadastre primeiro o <b>WhatsApp ${term('the')}</b> — é pra lá que as clientes vão mandar os pedidos de horário.</p>`,
       `<button class="btn btn-ghost" data-close>Depois</button><button class="btn btn-primary" id="lk_cfg">Cadastrar WhatsApp agora</button>`);
     $('#lk_cfg').onclick = () => { closeModal(); modalBiz(); };
     return;
@@ -2362,7 +2387,7 @@ function modalPinForgot() {
 
 function modalBiz() {
   const b = state.business;
-  const curTheme = ['fem', 'masc', 'pet'].includes(b.theme) ? b.theme : 'fem';
+  const curTheme = VALID_THEMES.includes(b.theme) ? b.theme : 'fem';
   const h = bizHours();
   const tz = b.timezone || DEFAULT_TZ;
   const diasLbl = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -2386,9 +2411,10 @@ function modalBiz() {
         <div class="tp ${curTheme === 'fem' ? 'on' : ''}" data-t="fem"><div class="tp-sw" style="background:linear-gradient(120deg,#f43f8e,#9b5de5)"></div><div class="tp-name">Rosa</div><div class="tp-sub">Beleza / Nails</div></div>
         <div class="tp ${curTheme === 'masc' ? 'on' : ''}" data-t="masc"><div class="tp-sw" style="background:linear-gradient(120deg,#2563eb,#1e3a8a)"></div><div class="tp-name">Azul</div><div class="tp-sub">Barbearia</div></div>
         <div class="tp ${curTheme === 'pet' ? 'on' : ''}" data-t="pet"><div class="tp-sw" style="background:linear-gradient(120deg,#22c55e,#047857)"></div><div class="tp-name">Verde</div><div class="tp-sub">Petshop</div></div>
+        <div class="tp ${curTheme === 'ink' ? 'on' : ''}" data-t="ink"><div class="tp-sw" style="background:linear-gradient(120deg,#374151,#000)"></div><div class="tp-name">Preto</div><div class="tp-sub">Tattoo</div></div>
       </div>
     </div>
-    <div class="field"><label>📲 WhatsApp ${term('do salão', 'da barbearia', 'do petshop')} <span class="muted" style="font-weight:400">(pra receber os agendamentos das clientes)</span></label><input class="input" id="g_wa" inputmode="tel" placeholder="Ex.: (22) 99244-5995" value="${esc(b.whatsapp || '')}"/></div>
+    <div class="field"><label>📲 WhatsApp ${term('the')} <span class="muted" style="font-weight:400">(pra receber os agendamentos das clientes)</span></label><input class="input" id="g_wa" inputmode="tel" placeholder="Ex.: (22) 99244-5995" value="${esc(b.whatsapp || '')}"/></div>
     <div class="field"><label>🕐 Fuso horário <span class="muted" style="font-weight:400">(base do "hoje" no caixa e na agenda)</span></label>
       <select class="input" id="g_tz">${tzOpts.map(([v, l]) => `<option value="${v}"${tz === v ? ' selected' : ''}>${l}</option>`).join('')}</select>
       <p class="muted" style="font-size:12.5px;margin:6px 2px 0">🕐 Agora no fuso escolhido: <b id="g_tznow">—</b></p>
@@ -2442,7 +2468,7 @@ function modalBiz() {
   $('#g_tz').onchange = tzNow; tzNow();
   const tzTimer = setInterval(() => { if (!$('#g_tznow')) return clearInterval(tzTimer); tzNow(); }, 20000);
   $('#g_save').onclick = () => {
-    const _th = $('#g_theme .tp.on'); b.theme = _th && ['fem', 'masc', 'pet'].includes(_th.dataset.t) ? _th.dataset.t : 'fem';
+    const _th = $('#g_theme .tp.on'); b.theme = _th && VALID_THEMES.includes(_th.dataset.t) ? _th.dataset.t : 'fem';
     const _sg = $('#g_seg'); if (_sg && SEGMENTS[_sg.value]) b.segment = _sg.value;   // ramo do negócio (adapta os textos)
     b.name = $('#g_name').value.trim() || b.name; b.reserveTarget = +$('#g_res').value || b.reserveTarget; b.monthlyGoal = +$('#g_goal').value || b.monthlyGoal;
     b.whatsapp = waPhone($('#g_wa').value);

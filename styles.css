@@ -63,7 +63,23 @@ html[data-theme="pet"]{
   --shadow:0 14px 40px -18px rgba(6,95,70,.30);
   --shadow-sm:0 6px 18px -10px rgba(6,95,70,.26);
 }
-.theme-pick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:2px}
+/* tema PRETO (tatuagem / ink / piercing) */
+html[data-theme="ink"]{
+  --rose:#111827;
+  --violet:#374151;
+  --grad:linear-gradient(120deg,#374151 0%,#111827 55%,#000000 100%);
+  --grad-soft:linear-gradient(120deg,#e5e7eb,#f3f4f6);
+  --bg:#f6f6f7;
+  --line:#e4e4e7;
+  --tint:#e5e7eb;
+  --tint-2:#f4f4f5;
+  --sel:#d4d4d8;
+  --glow:17,24,39;
+  --ring:17,24,39;
+  --shadow:0 14px 40px -18px rgba(0,0,0,.35);
+  --shadow-sm:0 6px 18px -10px rgba(0,0,0,.30);
+}
+.theme-pick{display:grid;grid-template-columns:repeat(auto-fit,minmax(82px,1fr));gap:8px;margin-top:2px}
 .tp{border:2px solid var(--line);border-radius:14px;padding:12px 8px;cursor:pointer;text-align:center;background:#fff;transition:.15s;user-select:none}
 .tp:hover{border-color:var(--ink-3)}
 .tp-sw{height:34px;border-radius:9px;margin-bottom:8px}
@@ -72,6 +88,7 @@ html[data-theme="pet"]{
 .tp.on[data-t="fem"]{border-color:#f43f8e;background:#fff5fa}
 .tp.on[data-t="masc"]{border-color:#1d4ed8;background:#eef4fe}
 .tp.on[data-t="pet"]{border-color:#16a34a;background:#effaf2}
+.tp.on[data-t="ink"]{border-color:#111827;background:#f1f1f2}
 
 /* seletor de TIPO DE NEGÓCIO no cadastro (ícone colorido por ramo) */
 .seg-pick{display:flex;flex-direction:column;gap:8px;margin-top:4px}

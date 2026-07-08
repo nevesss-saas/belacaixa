@@ -28,6 +28,12 @@
       --line:#d6efe0; --bg:#f2fbf6;
       --soft:#dcfce7; --svc-on:#eefaf1; --svc-hover:#bbf7d0; --ring:22,163,74; --card-sh:22,163,74;
     }
+    /* tema preto (tatuagem / ink / piercing) */
+    html[data-theme="ink"]{
+      --violet:#374151; --pink:#111827;
+      --line:#e4e4e7; --bg:#f6f6f7;
+      --soft:#e5e7eb; --svc-on:#f4f4f5; --svc-hover:#d4d4d8; --ring:17,24,39; --card-sh:17,24,39;
+    }
     *{box-sizing:border-box}
     body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--ink);
       background:linear-gradient(160deg,var(--soft) 0%,var(--bg) 40%);min-height:100vh;
@@ -159,13 +165,21 @@
     // "petshop" tem a mesma gramática de "salão" (o/do/no petshop), então derivamos a
     // palavra trocando "salão"→"petshop" no texto feminino — sem precisar de 3º argumento.
     var AG_SEG = 'salao';
-    function petWord(fem){ return fem.replace(/salão/g, 'petshop').replace(/Salão/g, 'Petshop'); }
-    function sal(fem, masc){ return AG_SEG === 'barbearia' ? masc : (AG_SEG === 'petshop' ? petWord(fem) : fem); }
+    // "petshop" e "estúdio" têm a mesma gramática de "salão" (o/do/pro/no ...), então
+    // derivamos a palavra trocando "salão"→"petshop"/"estúdio" no texto feminino.
+    var SEG_REPL = { petshop: 'petshop', tattoo: 'estúdio' };
+    function segReplace(fem){
+      var w = SEG_REPL[AG_SEG];
+      if(!w) return fem;
+      var Cap = w.charAt(0).toUpperCase() + w.slice(1);
+      return fem.replace(/salão/g, w).replace(/Salão/g, Cap);
+    }
+    function sal(fem, masc){ return AG_SEG === 'barbearia' ? masc : segReplace(fem); }
     function applyAgTerms(){
       var els = document.querySelectorAll('[data-term-fem][data-term-masc]');
       for(var i=0;i<els.length;i++){
         var fem = els[i].getAttribute('data-term-fem'), masc = els[i].getAttribute('data-term-masc');
-        els[i].textContent = AG_SEG === 'barbearia' ? masc : (AG_SEG === 'petshop' ? petWord(fem) : fem);
+        els[i].textContent = AG_SEG === 'barbearia' ? masc : segReplace(fem);
       }
     }
     function brDate(iso){
@@ -201,11 +215,11 @@
     function boot(data){
       if(loadView) loadView.classList.add('hidden');
       formView.classList.remove('hidden');
-      // tema visual do salão (rosa / azul / verde) — combina com o painel do dono
+      // tema visual do salão (rosa / azul / verde / preto) — combina com o painel do dono
       var _th = data.theme || data.t;
-      document.documentElement.setAttribute('data-theme', (_th === 'masc' || _th === 'pet') ? _th : 'fem');
+      document.documentElement.setAttribute('data-theme', (['masc', 'pet', 'ink'].indexOf(_th) >= 0) ? _th : 'fem');
       // ramo do negócio (adapta as palavras). Links antigos sem `seg` caem no fallback pela cor.
-      AG_SEG = (['salao', 'barbearia', 'petshop'].indexOf(data.seg) >= 0) ? data.seg
+      AG_SEG = (['salao', 'barbearia', 'petshop', 'tattoo'].indexOf(data.seg) >= 0) ? data.seg
         : ((data.theme || data.t) === 'masc' ? 'barbearia' : 'salao');
       applyAgTerms();                                  // adapta "salão/barbearia/petshop" nos textos fixos
       var biz = data.b || sal('Salão', 'Barbearia');
