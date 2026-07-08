@@ -1,9 +1,3 @@
-﻿Seletor de ramo (segmento): salao/barbearia/petshop, app se adapta
-
-- Tela de escolha no 1o acesso (lista rolavel com icones) + editavel nas Configuracoes
-- Segmento desacoplado da cor: palavra do negocio vem do ramo, cor independente (fallback pela cor p/ contas antigas e landing)
-- Sugere a cor do ramo ao escolher (dá pra trocar depois)
-- Catalogo modelo opcional por ramo (1 toque; conta segue zerada se recusar)
-- Pagina publica agendar.html + booking-info adaptam as palavras ao segmento (petshop deriva de salao)
+﻿Segmento: aplicar cor sugerida so em conta nova/vazia (nao troca cor de quem ja tem dados)
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>

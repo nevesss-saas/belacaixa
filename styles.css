@@ -47,14 +47,40 @@ html[data-theme="masc"]{
   --shadow:0 14px 40px -18px rgba(20,50,120,.30);
   --shadow-sm:0 6px 18px -10px rgba(20,50,120,.26);
 }
-.theme-pick{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:2px}
-.tp{border:2px solid var(--line);border-radius:14px;padding:12px 10px;cursor:pointer;text-align:center;background:#fff;transition:.15s;user-select:none}
+/* tema VERDE (petshop / banho e tosa) */
+html[data-theme="pet"]{
+  --rose:#16a34a;
+  --violet:#047857;
+  --grad:linear-gradient(120deg,#22c55e 0%,#16a34a 55%,#047857 100%);
+  --grad-soft:linear-gradient(120deg,#dcfce7,#e7f9ee);
+  --bg:#f5faf7;
+  --line:#e2f0e8;
+  --tint:#dcfce7;
+  --tint-2:#eefaf1;
+  --sel:#bbf7d0;
+  --glow:22,163,74;
+  --ring:22,163,74;
+  --shadow:0 14px 40px -18px rgba(6,95,70,.30);
+  --shadow-sm:0 6px 18px -10px rgba(6,95,70,.26);
+}
+.theme-pick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:2px}
+.tp{border:2px solid var(--line);border-radius:14px;padding:12px 8px;cursor:pointer;text-align:center;background:#fff;transition:.15s;user-select:none}
 .tp:hover{border-color:var(--ink-3)}
 .tp-sw{height:34px;border-radius:9px;margin-bottom:8px}
 .tp-name{font-weight:700;font-size:14px;color:var(--ink)}
 .tp-sub{font-size:11.5px;color:var(--ink-3);margin-top:1px}
 .tp.on[data-t="fem"]{border-color:#f43f8e;background:#fff5fa}
 .tp.on[data-t="masc"]{border-color:#1d4ed8;background:#eef4fe}
+.tp.on[data-t="pet"]{border-color:#16a34a;background:#effaf2}
+
+/* seletor de TIPO DE NEGÓCIO no cadastro (ícone colorido por ramo) */
+.seg-pick{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.segp{display:flex;align-items:center;gap:12px;width:100%;padding:11px 13px;border:2px solid var(--line);border-radius:14px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:.15s}
+.segp:hover{border-color:var(--segc,var(--rose))}
+.segp.on{border-color:var(--segc,var(--rose));background:color-mix(in srgb,var(--segc,var(--rose)) 8%,#fff);box-shadow:0 6px 18px -12px var(--segc,var(--rose))}
+.segp-ic{flex:0 0 auto;display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:color-mix(in srgb,var(--segc,var(--rose)) 13%,#fff)}
+.segp-ic svg{display:block}
+.segp-tx{flex:1 1 auto;font-weight:700;font-size:14.5px;color:var(--ink)}
 .tp-dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:6px}
 .lp-theme{display:inline-flex;align-items:center;gap:9px}
 .tsw{width:24px;height:24px;border-radius:50%;border:none;cursor:pointer;padding:0;box-shadow:0 0 0 1px var(--line);transition:transform .15s,box-shadow .15s}
@@ -597,8 +623,9 @@ textarea{resize:vertical;min-height:70px}
 .seg-sub{color:var(--ink-2);font-size:14.5px;line-height:1.5;margin:0 0 20px}
 .seg-list{display:flex;flex-direction:column;gap:11px}
 .seg-opt{display:flex;align-items:center;gap:14px;width:100%;padding:15px 16px;border:2px solid var(--line);border-radius:15px;background:#fff;cursor:pointer;font-family:inherit;text-align:left;transition:.15s}
-.seg-opt:hover{border-color:var(--rose);background:var(--tint-2);transform:translateY(-1px)}
-.seg-ic{font-size:26px;line-height:1;flex:0 0 auto}
+.seg-opt:hover{border-color:var(--segc,var(--rose));background:#fafafa;transform:translateY(-1px)}
+.seg-ic{font-size:26px;line-height:1;flex:0 0 auto;display:grid;place-items:center;width:40px;height:40px;border-radius:11px;background:color-mix(in srgb,var(--segc,var(--rose)) 12%,#fff)}
+.seg-ic svg{display:block}
 .seg-name{flex:1 1 auto;font-weight:700;font-size:16px;color:var(--ink)}
 .seg-arrow{flex:0 0 auto;font-size:22px;color:var(--rose);font-weight:700}
 /* prévia do catálogo modelo */

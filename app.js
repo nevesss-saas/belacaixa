@@ -657,9 +657,10 @@ function toast(msg, type = 'info', dur = 3200, action = null) {
 // do emoji de unha 💅. Os data-fem/data-masc deixam o applyTheme trocar a cor ao vivo.
 function brandIco(px) {
   px = px || 40;
-  const fem = 'logo-icon.png?v=20260706g', masc = 'logo-icon-masc.png?v=20260706i';
-  const cur = (document.documentElement.dataset.theme === 'masc') ? masc : fem;
-  return `<img class="brand-ico" src="${cur}" data-fem="${fem}" data-masc="${masc}" alt="BelaCaixa" style="width:${px}px;height:${px}px;object-fit:contain;display:inline-block;vertical-align:middle">`;
+  const fem = 'logo-icon.png?v=20260706g', masc = 'logo-icon-masc.png?v=20260706i', pet = 'logo-icon-pet.png?v=20260708a';
+  const th = document.documentElement.dataset.theme;
+  const cur = th === 'masc' ? masc : (th === 'pet' ? pet : fem);
+  return `<img class="brand-ico" src="${cur}" data-fem="${fem}" data-masc="${masc}" data-pet="${pet}" alt="BelaCaixa" style="width:${px}px;height:${px}px;object-fit:contain;display:inline-block;vertical-align:middle">`;
 }
 function openModal(title, body, foot) {
   $('#modalRoot').innerHTML = `<div class="modal-bg" data-close-bg>
@@ -1401,14 +1402,18 @@ function updatePrivacyEye() {
 }
 
 const THEME_KEY = 'belacaixa_theme', THEME_CHOSEN_KEY = 'belacaixa_theme_chosen';
-function savedThemePref() { try { const t = localStorage.getItem(THEME_KEY); return (t === 'masc' || t === 'fem') ? t : null; } catch (e) { return null; } }
+const VALID_THEMES = ['fem', 'masc', 'pet'];   // rosa / azul / verde
+const THEME_COLOR = { fem: '#f43f8e', masc: '#1d4ed8', pet: '#16a34a' };
+function savedThemePref() { try { const t = localStorage.getItem(THEME_KEY); return VALID_THEMES.includes(t) ? t : null; } catch (e) { return null; } }
 function themeChosen() { try { return !!localStorage.getItem(THEME_CHOSEN_KEY); } catch (e) { return false; } }
 function applyTheme(force) {
-  const t = force || ((state && state.business && state.business.theme === 'masc') ? 'masc' : 'fem');
+  let t = force || (state && state.business && state.business.theme) || 'fem';
+  if (!VALID_THEMES.includes(t)) t = 'fem';
   document.documentElement.setAttribute('data-theme', t);
   try { localStorage.setItem(THEME_KEY, t); if (!force) localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
+  // logo conforme a cor: rosa (data-fem) / azul (data-masc) / verde (data-pet, cai no fem se faltar)
   document.querySelectorAll('img[data-fem][data-masc]').forEach(img => {
-    const want = t === 'masc' ? img.dataset.masc : img.dataset.fem;
+    const want = t === 'masc' ? img.dataset.masc : (t === 'pet' ? (img.dataset.pet || img.dataset.fem) : img.dataset.fem);
     if (img.getAttribute('src') !== want) img.setAttribute('src', want);
   });
   // termo do negócio conforme o SEGMENTO (salão/barbearia/petshop) — independente da cor
@@ -1418,16 +1423,17 @@ function applyTheme(force) {
     if (el.textContent !== want) el.textContent = want;
   });
   document.querySelectorAll('.tsw[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
-  // PWA: a cor da barra do sistema (app instalado) acompanha o tema rosa/azul
+  // PWA: a cor da barra do sistema (app instalado) acompanha o tema (rosa/azul/verde)
   const tc = document.querySelector('meta[name="theme-color"]');
-  if (tc) tc.setAttribute('content', t === 'masc' ? '#1d4ed8' : '#f43f8e');
+  if (tc) tc.setAttribute('content', THEME_COLOR[t] || THEME_COLOR.fem);
 }
 // SEGMENTOS (ramos) que o BelaCaixa atende. Cada um define as PALAVRAS do negócio,
 // um ícone, a cor sugerida e um catálogo modelo opcional. O segmento é INDEPENDENTE
 // da cor: o dono escolhe o ramo (o app se adapta) e ainda pode trocar rosa/azul.
 const SEGMENTS = {
   salao: {
-    key: 'salao', label: 'Salão de beleza', icon: '💇‍♀️', theme: 'fem',
+    key: 'salao', label: 'Salão · Nails · Sobrancelha', icon: '💅', theme: 'fem', color: '#f43f8e',
+    svg: '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><rect x="9.2" y="2" width="5.6" height="3.2" rx="1" fill="#f43f8e"/><rect x="8.4" y="5.4" width="7.2" height="3.6" rx="1" fill="#f9a8cf"/><path d="M8.2 9h7.6a1 1 0 0 1 1 1v9.5A1.5 1.5 0 0 1 15.3 21H8.7a1.5 1.5 0 0 1-1.5-1.5V10a1 1 0 0 1 1-1z" fill="#f43f8e"/><rect x="8.9" y="12.4" width="6.2" height="3.4" rx="1" fill="#fff" opacity=".5"/></svg>',
     defName: 'Meu salão', bare: 'salão',
     catalog: [
       { name: 'Corte feminino', price: 70, dur: 60 },
@@ -1438,7 +1444,8 @@ const SEGMENTS = {
     ],
   },
   barbearia: {
-    key: 'barbearia', label: 'Barbearia', icon: '💈', theme: 'masc',
+    key: 'barbearia', label: 'Barbearia', icon: '💈', theme: 'masc', color: '#1d4ed8',
+    svg: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#1d4ed8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>',
     defName: 'Minha barbearia', bare: 'barbearia',
     catalog: [
       { name: 'Corte masculino', price: 45, dur: 40 },
@@ -1449,7 +1456,8 @@ const SEGMENTS = {
     ],
   },
   petshop: {
-    key: 'petshop', label: 'Petshop · Banho e tosa', icon: '🐾', theme: 'fem',
+    key: 'petshop', label: 'Petshop · Banho e tosa', icon: '🐾', theme: 'pet', color: '#16a34a',
+    svg: '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="#16a34a"><ellipse cx="6" cy="11" rx="2.1" ry="2.7"/><ellipse cx="18" cy="11" rx="2.1" ry="2.7"/><ellipse cx="9.6" cy="6.7" rx="2" ry="2.6"/><ellipse cx="14.4" cy="6.7" rx="2" ry="2.6"/><path d="M12 12.4c-2.7 0-5 1.9-5 4.2 0 1.8 1.5 2.8 3.1 2.8 .95 0 1.4-.35 1.9-.35s.95 .35 1.9 .35c1.6 0 3.1-1 3.1-2.8 0-2.3-2.3-4.2-5-4.2z"/></svg>',
     defName: 'Meu petshop', bare: 'petshop',
     catalog: [
       { name: 'Banho (porte pequeno)', price: 50, dur: 60 },
@@ -2354,7 +2362,7 @@ function modalPinForgot() {
 
 function modalBiz() {
   const b = state.business;
-  const curTheme = b.theme === 'masc' ? 'masc' : 'fem';
+  const curTheme = ['fem', 'masc', 'pet'].includes(b.theme) ? b.theme : 'fem';
   const h = bizHours();
   const tz = b.timezone || DEFAULT_TZ;
   const diasLbl = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -2375,8 +2383,9 @@ function modalBiz() {
     </div>
     <div class="field"><label>🎨 Tema do painel <span class="muted" style="font-weight:400">(identidade visual do sistema)</span></label>
       <div class="theme-pick" id="g_theme">
-        <div class="tp ${curTheme === 'fem' ? 'on' : ''}" data-t="fem"><div class="tp-sw" style="background:linear-gradient(120deg,#f43f8e,#9b5de5)"></div><div class="tp-name">Feminino</div><div class="tp-sub">Rosé (padrão)</div></div>
-        <div class="tp ${curTheme === 'masc' ? 'on' : ''}" data-t="masc"><div class="tp-sw" style="background:linear-gradient(120deg,#2563eb,#1e3a8a)"></div><div class="tp-name">Masculino</div><div class="tp-sub">Azul</div></div>
+        <div class="tp ${curTheme === 'fem' ? 'on' : ''}" data-t="fem"><div class="tp-sw" style="background:linear-gradient(120deg,#f43f8e,#9b5de5)"></div><div class="tp-name">Rosa</div><div class="tp-sub">Beleza / Nails</div></div>
+        <div class="tp ${curTheme === 'masc' ? 'on' : ''}" data-t="masc"><div class="tp-sw" style="background:linear-gradient(120deg,#2563eb,#1e3a8a)"></div><div class="tp-name">Azul</div><div class="tp-sub">Barbearia</div></div>
+        <div class="tp ${curTheme === 'pet' ? 'on' : ''}" data-t="pet"><div class="tp-sw" style="background:linear-gradient(120deg,#22c55e,#047857)"></div><div class="tp-name">Verde</div><div class="tp-sub">Petshop</div></div>
       </div>
     </div>
     <div class="field"><label>📲 WhatsApp ${term('do salão', 'da barbearia', 'do petshop')} <span class="muted" style="font-weight:400">(pra receber os agendamentos das clientes)</span></label><input class="input" id="g_wa" inputmode="tel" placeholder="Ex.: (22) 99244-5995" value="${esc(b.whatsapp || '')}"/></div>
@@ -2433,7 +2442,7 @@ function modalBiz() {
   $('#g_tz').onchange = tzNow; tzNow();
   const tzTimer = setInterval(() => { if (!$('#g_tznow')) return clearInterval(tzTimer); tzNow(); }, 20000);
   $('#g_save').onclick = () => {
-    const _th = $('#g_theme .tp.on'); b.theme = _th && _th.dataset.t === 'masc' ? 'masc' : 'fem';
+    const _th = $('#g_theme .tp.on'); b.theme = _th && ['fem', 'masc', 'pet'].includes(_th.dataset.t) ? _th.dataset.t : 'fem';
     const _sg = $('#g_seg'); if (_sg && SEGMENTS[_sg.value]) b.segment = _sg.value;   // ramo do negócio (adapta os textos)
     b.name = $('#g_name').value.trim() || b.name; b.reserveTarget = +$('#g_res').value || b.reserveTarget; b.monthlyGoal = +$('#g_goal').value || b.monthlyGoal;
     b.whatsapp = waPhone($('#g_wa').value);
@@ -2545,14 +2554,18 @@ function wireAuth() {
   $('#auSwitch').onclick = e => { e.preventDefault(); setAuthMode(authMode === 'signup' ? 'login' : 'signup'); };
   $$('[data-auth-back]').forEach(b => b.onclick = () => exitApp());
   $('#authForm').addEventListener('submit', onAuthSubmit);
-  const th = $('#au_theme');
-  if (th) th.querySelectorAll('.tp').forEach(c => c.onclick = () => {
-    th.querySelectorAll('.tp').forEach(x => x.classList.toggle('on', x === c));
-    applyTheme(c.dataset.t);
-    try { localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
-    const note = $('#authThemeNote'); if (note) note.classList.remove('first');
-    toast('Tema ' + (c.dataset.t === 'masc' ? 'Azul' : 'Rosa') + ' aplicado!', 'ok');
-  });
+  // Seletor de TIPO DE NEGÓCIO no cadastro (ícone colorido por ramo). Ao escolher,
+  // já pré-visualiza a cor; no signup grava o segmento + a cor do ramo escolhido.
+  const segBox = $('#au_seg');
+  if (segBox) {
+    segBox.innerHTML = SEGMENT_ORDER.map((k, i) => { const s = SEGMENTS[k]; return `<button type="button" class="segp${i === 0 ? ' on' : ''}" data-seg="${k}" data-t="${s.theme}" style="--segc:${s.color}"><span class="segp-ic">${s.svg}</span><span class="segp-tx">${s.label}</span></button>`; }).join('');
+    segBox.querySelectorAll('.segp').forEach(b => b.onclick = () => {
+      segBox.querySelectorAll('.segp').forEach(x => x.classList.toggle('on', x === b));
+      applyTheme(b.dataset.t);
+      try { localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
+      const note = $('#authThemeNote'); if (note) note.classList.remove('first');
+    });
+  }
 }
 async function onAuthSubmit(e) {
   e.preventDefault();
@@ -2568,11 +2581,15 @@ async function onAuthSubmit(e) {
       if (!data.session) { const r = await sb.auth.signInWithPassword({ email, password: pass }); if (r.error) throw r.error; currentUser = r.data.user; }
       else currentUser = data.user;
       await cloudLoad();
-      const _th = savedThemePref();
+      // ramo escolhido no cadastro → define o segmento E a cor do painel (rosa/azul/verde)
+      const selSeg = document.querySelector('#au_seg .segp.on');
+      const _seg = selSeg && SEGMENTS[selSeg.dataset.seg] ? selSeg.dataset.seg : null;
+      const _th = _seg ? SEGMENTS[_seg].theme : savedThemePref();
       if (state) {
         if (biz) state.business.name = biz;
+        if (_seg) state.business.segment = _seg;
         if (_th) state.business.theme = _th;
-        if (biz || _th) save();
+        save();
       }
     } else {
       const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
@@ -2834,6 +2851,7 @@ function finishEnterApp() {
   subscribeTenantRealtime();  // reservas do link aparecem na agenda sozinhas (sem recarregar)
   render(); window.scrollTo(0, 0);
   consumeBookingDeepLink();   // se veio de um link "1 toque p/ agendar", abre o modal já preenchido
+  maybeOfferCatalog();        // conta nova com ramo definido → oferece o catálogo modelo (1 vez)
 }
 /* ---------------- ESCOLHA DE RAMO (segmento) — 1º acesso ---------------- */
 function needsSegmentChoice() {
@@ -2847,7 +2865,7 @@ function showSegmentPicker(onDone) {
     <div class="seg-logo">${brandIco(52)}</div>
     <h2>Bem-vindo(a) ao BelaCaixa! 👋</h2>
     <p class="seg-sub">O que você faz? Escolha seu ramo — o app já se adapta a você.<br><span class="muted">Dá pra mudar depois nas Configurações.</span></p>
-    <div class="seg-list">${SEGMENT_ORDER.map(k => { const s = SEGMENTS[k]; return `<button type="button" class="seg-opt" data-seg="${k}"><span class="seg-ic">${s.icon}</span><span class="seg-name">${s.label}</span><span class="seg-arrow">›</span></button>`; }).join('')}</div>
+    <div class="seg-list">${SEGMENT_ORDER.map(k => { const s = SEGMENTS[k]; return `<button type="button" class="seg-opt" data-seg="${k}" style="--segc:${s.color}"><span class="seg-ic">${s.svg || s.icon}</span><span class="seg-name">${s.label}</span><span class="seg-arrow" style="color:${s.color}">›</span></button>`; }).join('')}</div>
   </div></div>`;
   $('#app').hidden = true; $('#landing').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true;
   document.body.style.background = 'var(--bg)';
@@ -2865,10 +2883,19 @@ function chooseSegment(key, opts) {
   applyTheme();
   save();
   const el = document.getElementById('segScreen'); if (el) el.hidden = true;
-  const proceed = opts.onDone || (() => {});
-  // catálogo modelo opcional — só se o segmento tiver e a conta ainda estiver sem serviços
-  if (s.catalog && s.catalog.length && !(state.services && state.services.length)) offerModelCatalog(key, proceed);
-  else proceed();
+  (opts.onDone || (() => {}))();   // continua p/ o app; o catálogo modelo é oferecido no finishEnterApp
+}
+// Oferece o catálogo modelo UMA vez (conta nova com ramo definido e sem serviços).
+// Vale tanto pra quem escolheu o ramo no cadastro quanto na tela de 1º acesso.
+function maybeOfferCatalog() {
+  if (demoMode || isAdmin() || !state || !state.business) return;
+  if (document.querySelector('#modalRoot .modal')) return;   // não atropela um modal já aberto (ex.: pedido do link)
+  const b = state.business;
+  if (!b.segment || b.catAsked) return;
+  const seg = SEGMENTS[b.segment];
+  if ((state.services && state.services.length) || !seg || !seg.catalog || !seg.catalog.length) { b.catAsked = true; save(); return; }
+  b.catAsked = true; save();
+  offerModelCatalog(b.segment, () => render());
 }
 function offerModelCatalog(key, onDone) {
   const s = SEGMENTS[key];

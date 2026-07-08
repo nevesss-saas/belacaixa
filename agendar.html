@@ -22,6 +22,12 @@
       --line:#dbe6fb; --bg:#f4f8ff;
       --soft:#e6effd; --svc-on:#eef4fe; --svc-hover:#c3d8fb; --ring:37,99,235; --card-sh:37,99,235;
     }
+    /* tema verde (petshop / banho e tosa) */
+    html[data-theme="pet"]{
+      --violet:#047857; --pink:#16a34a;
+      --line:#d6efe0; --bg:#f2fbf6;
+      --soft:#dcfce7; --svc-on:#eefaf1; --svc-hover:#bbf7d0; --ring:22,163,74; --card-sh:22,163,74;
+    }
     *{box-sizing:border-box}
     body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--ink);
       background:linear-gradient(160deg,var(--soft) 0%,var(--bg) 40%);min-height:100vh;
@@ -195,8 +201,9 @@
     function boot(data){
       if(loadView) loadView.classList.add('hidden');
       formView.classList.remove('hidden');
-      // tema visual do salão (rosa padrão / azul "masc") — combina com o painel do dono
-      document.documentElement.setAttribute('data-theme', (data.theme || data.t) === 'masc' ? 'masc' : 'fem');
+      // tema visual do salão (rosa / azul / verde) — combina com o painel do dono
+      var _th = data.theme || data.t;
+      document.documentElement.setAttribute('data-theme', (_th === 'masc' || _th === 'pet') ? _th : 'fem');
       // ramo do negócio (adapta as palavras). Links antigos sem `seg` caem no fallback pela cor.
       AG_SEG = (['salao', 'barbearia', 'petshop'].indexOf(data.seg) >= 0) ? data.seg
         : ((data.theme || data.t) === 'masc' ? 'barbearia' : 'salao');
