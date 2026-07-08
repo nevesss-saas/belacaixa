@@ -689,13 +689,18 @@ function hardenModalInputs(root) {
     // (assim o Chrome NÃO o registra pra autofill) e é liberado quando o usuário foca/toca. As
     // sugestões do próprio app (<datalist> = só os dados DESTA conta) continuam funcionando normal.
     const isText = el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && ['text', 'search', ''].includes(el.getAttribute('type') || 'text'));
-    if (isText) {
-      el.readOnly = true;
-      const unlock = () => { el.readOnly = false; };
-      el.addEventListener('focus', unlock, { once: true });
-      el.addEventListener('pointerdown', unlock, { once: true });
-    }
+    if (isText) armReadonlyUntilTouch(el);
   });
+}
+// Impede o Chrome de autopreencher um campo de TEXTO com o que foi digitado em OUTRA conta no
+// mesmo aparelho: o campo nasce readonly (o navegador não o registra p/ autofill) e é liberado
+// no 1º foco/toque. Reutilizado nos modais e no "Nome do negócio" do cadastro.
+function armReadonlyUntilTouch(el) {
+  if (!el) return;
+  el.readOnly = true;
+  const unlock = () => { el.readOnly = false; };
+  el.addEventListener('focus', unlock, { once: true });
+  el.addEventListener('pointerdown', unlock, { once: true });
 }
 function closeModal() { $('#modalRoot').innerHTML = ''; }
 
@@ -2598,6 +2603,10 @@ function wireAuth() {
   $('#auSwitch').onclick = e => { e.preventDefault(); setAuthMode(authMode === 'signup' ? 'login' : 'signup'); };
   $$('[data-auth-back]').forEach(b => b.onclick = () => exitApp());
   $('#authForm').addEventListener('submit', onAuthSubmit);
+  // Nome do negócio no cadastro: mesmo anti-autofill dos modais (não sugere o nome digitado em
+  // OUTRA conta no mesmo aparelho). E-mail/senha ficam com autofill normal (login rápido/gerenciador).
+  const bizInp = $('#auBiz');
+  if (bizInp) { bizInp.setAttribute('autocomplete', 'off'); bizInp.setAttribute('name', 'f_' + Math.random().toString(36).slice(2, 9)); bizInp.setAttribute('data-lpignore', 'true'); bizInp.setAttribute('data-form-type', 'other'); armReadonlyUntilTouch(bizInp); }
   // Seletor de TIPO DE NEGÓCIO no cadastro (ícone colorido por ramo). Ao escolher,
   // já pré-visualiza a cor; no signup grava o segmento + a cor do ramo escolhido.
   const segBox = $('#au_seg');
