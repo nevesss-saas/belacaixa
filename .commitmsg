@@ -1,9 +1,8 @@
-﻿Ramo TATTOO (ink) + tema PRETO + sistema de palavras escalavel
+﻿Tema/ramo (identidade visual) só para admin/demo nas Configurações
 
-- Novo segmento tattoo (Tatuagem/Ink/Piercing): tema preto, icone gota de tinta preta, catalogo modelo, placeholder proprio
-- 4a paleta de cor (preto/ink) + logos pretas (icon/larga/compacta) geradas
-- term() refatorado p/ KIND (SEGMENTS[seg].terms) — escalavel, novo ramo nao mexe no term()
-- Configuracoes: 4 temas (Rosa/Azul/Verde/Preto); curTheme usa VALID_THEMES
-- agendar.html + booking-info suportam tattoo (estudio) e tema ink
+Conta comum já escolhe o ramo e a cor no cadastro, então o seletor
+"Tema do painel" e o "Ramo do negócio" somem do modal de Configurações
+para usuários comuns (ficam só para admin/demo, para apresentação).
+O save preserva o tema/segmento quando o seletor está oculto.
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>

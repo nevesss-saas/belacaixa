@@ -2401,8 +2401,10 @@ function modalBiz() {
     ['America/Rio_Branco', 'Acre (UTC−5) — AC e oeste do AM'],
     ['America/Noronha', 'Fernando de Noronha (UTC−2)'],
   ];
-  openModal('Configurações do negócio', `
-    <div class="field"><label>Nome do negócio</label><input class="input" id="g_name" value="${esc(b.name)}"/></div>
+  // Ramo + tema (identidade visual) só aparecem pra admin/demo (apresentação).
+  // Conta comum já escolheu o ramo/cor no cadastro, então o painel fica travado nisso.
+  const showIdent = isAdmin() || demoMode;
+  const identFields = showIdent ? `
     <div class="field"><label>🏷️ Ramo do negócio <span class="muted" style="font-weight:400">(adapta os textos e a página de agendamento ao seu segmento)</span></label>
       <select class="input" id="g_seg">${SEGMENT_ORDER.map(k => `<option value="${k}"${segmentKey() === k ? ' selected' : ''}>${SEGMENTS[k].icon} ${SEGMENTS[k].label}</option>`).join('')}</select>
     </div>
@@ -2413,7 +2415,10 @@ function modalBiz() {
         <div class="tp ${curTheme === 'pet' ? 'on' : ''}" data-t="pet"><div class="tp-sw" style="background:linear-gradient(120deg,#22c55e,#047857)"></div><div class="tp-name">Verde</div><div class="tp-sub">Petshop</div></div>
         <div class="tp ${curTheme === 'ink' ? 'on' : ''}" data-t="ink"><div class="tp-sw" style="background:linear-gradient(120deg,#374151,#000)"></div><div class="tp-name">Preto</div><div class="tp-sub">Tattoo</div></div>
       </div>
-    </div>
+    </div>` : '';
+  openModal('Configurações do negócio', `
+    <div class="field"><label>Nome do negócio</label><input class="input" id="g_name" value="${esc(b.name)}"/></div>
+    ${identFields}
     <div class="field"><label>📲 WhatsApp ${term('the')} <span class="muted" style="font-weight:400">(pra receber os agendamentos das clientes)</span></label><input class="input" id="g_wa" inputmode="tel" placeholder="Ex.: (22) 99244-5995" value="${esc(b.whatsapp || '')}"/></div>
     <div class="field"><label>🕐 Fuso horário <span class="muted" style="font-weight:400">(base do "hoje" no caixa e na agenda)</span></label>
       <select class="input" id="g_tz">${tzOpts.map(([v, l]) => `<option value="${v}"${tz === v ? ' selected' : ''}>${l}</option>`).join('')}</select>
@@ -2450,7 +2455,8 @@ function modalBiz() {
     <button class="btn btn-danger btn-sm" id="g_reset">↺ Restaurar dados de demonstração</button>
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="g_save">Salvar</button>`);
   bindPinSection();
-  $('#g_theme').querySelectorAll('.tp').forEach(c => c.onclick = () => { $('#g_theme').querySelectorAll('.tp').forEach(x => x.classList.toggle('on', x === c)); applyTheme(c.dataset.t); });
+  const gTheme = $('#g_theme');
+  if (gTheme) gTheme.querySelectorAll('.tp').forEach(c => c.onclick = () => { gTheme.querySelectorAll('.tp').forEach(x => x.classList.toggle('on', x === c)); applyTheme(c.dataset.t); });
   $('#g_days').querySelectorAll('button[data-d]').forEach(btn => btn.onclick = () => { btn.classList.toggle('btn-primary'); btn.classList.toggle('btn-ghost'); });
   // almoço: liga/desliga a caixa, alterna "dias específicos", e chips clicáveis
   const lunchBox = $('#g_lunch_box'), lunchDaysRow = $('#g_lunch_days'), lunchScope = $('#g_lunch_scope');
@@ -2468,7 +2474,7 @@ function modalBiz() {
   $('#g_tz').onchange = tzNow; tzNow();
   const tzTimer = setInterval(() => { if (!$('#g_tznow')) return clearInterval(tzTimer); tzNow(); }, 20000);
   $('#g_save').onclick = () => {
-    const _th = $('#g_theme .tp.on'); b.theme = _th && VALID_THEMES.includes(_th.dataset.t) ? _th.dataset.t : 'fem';
+    const _th = $('#g_theme .tp.on'); if (_th && VALID_THEMES.includes(_th.dataset.t)) b.theme = _th.dataset.t;   // só admin/demo edita o tema; conta comum mantém o que escolheu no cadastro
     const _sg = $('#g_seg'); if (_sg && SEGMENTS[_sg.value]) b.segment = _sg.value;   // ramo do negócio (adapta os textos)
     b.name = $('#g_name').value.trim() || b.name; b.reserveTarget = +$('#g_res').value || b.reserveTarget; b.monthlyGoal = +$('#g_goal').value || b.monthlyGoal;
     b.whatsapp = waPhone($('#g_wa').value);
