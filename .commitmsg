@@ -1,3 +1,9 @@
-﻿Cadastro: placeholder do "Nome do seu negocio" acompanha o ramo escolhido
+﻿Ramo TATTOO (ink) + tema PRETO + sistema de palavras escalavel
+
+- Novo segmento tattoo (Tatuagem/Ink/Piercing): tema preto, icone gota de tinta preta, catalogo modelo, placeholder proprio
+- 4a paleta de cor (preto/ink) + logos pretas (icon/larga/compacta) geradas
+- term() refatorado p/ KIND (SEGMENTS[seg].terms) — escalavel, novo ramo nao mexe no term()
+- Configuracoes: 4 temas (Rosa/Azul/Verde/Preto); curTheme usa VALID_THEMES
+- agendar.html + booking-info suportam tattoo (estudio) e tema ink
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
