@@ -1,0 +1,8 @@
+﻿Fluxo de Caixa: categorias personalizadas (+ incluir) em Nova entrada/saida
+
+- Botao + ao lado do seletor de Categoria abre campo pra criar categoria propria
+- Salva por tipo em state.business.customCats (in/out separados), bloqueia duplicata
+- Nova categoria entra antes de "Outros" e ja fica selecionada
+- Botao + segue o tema (rosa/azul); campo full-width no mobile
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>

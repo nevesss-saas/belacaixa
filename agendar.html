@@ -149,12 +149,18 @@
         return JSON.parse(decodeURIComponent(escape(atob(b64))));
       }catch(e){ return null; }
     }
-    // termo do negócio conforme o tema: "salão" (rosa) / "barbearia" (azul).
-    function sal(fem, masc){ return document.documentElement.getAttribute('data-theme') === 'masc' ? masc : fem; }
+    // ramo do negócio (salão / barbearia / petshop) — vem do painel do dono (data.seg).
+    // "petshop" tem a mesma gramática de "salão" (o/do/no petshop), então derivamos a
+    // palavra trocando "salão"→"petshop" no texto feminino — sem precisar de 3º argumento.
+    var AG_SEG = 'salao';
+    function petWord(fem){ return fem.replace(/salão/g, 'petshop').replace(/Salão/g, 'Petshop'); }
+    function sal(fem, masc){ return AG_SEG === 'barbearia' ? masc : (AG_SEG === 'petshop' ? petWord(fem) : fem); }
     function applyAgTerms(){
-      var masc = document.documentElement.getAttribute('data-theme') === 'masc';
       var els = document.querySelectorAll('[data-term-fem][data-term-masc]');
-      for(var i=0;i<els.length;i++){ els[i].textContent = masc ? els[i].getAttribute('data-term-masc') : els[i].getAttribute('data-term-fem'); }
+      for(var i=0;i<els.length;i++){
+        var fem = els[i].getAttribute('data-term-fem'), masc = els[i].getAttribute('data-term-masc');
+        els[i].textContent = AG_SEG === 'barbearia' ? masc : (AG_SEG === 'petshop' ? petWord(fem) : fem);
+      }
     }
     function brDate(iso){
       if(!iso) return '';
@@ -191,7 +197,10 @@
       formView.classList.remove('hidden');
       // tema visual do salão (rosa padrão / azul "masc") — combina com o painel do dono
       document.documentElement.setAttribute('data-theme', (data.theme || data.t) === 'masc' ? 'masc' : 'fem');
-      applyAgTerms();                                  // troca "salão"↔"barbearia" nos textos fixos
+      // ramo do negócio (adapta as palavras). Links antigos sem `seg` caem no fallback pela cor.
+      AG_SEG = (['salao', 'barbearia', 'petshop'].indexOf(data.seg) >= 0) ? data.seg
+        : ((data.theme || data.t) === 'masc' ? 'barbearia' : 'salao');
+      applyAgTerms();                                  // adapta "salão/barbearia/petshop" nos textos fixos
       var biz = data.b || sal('Salão', 'Barbearia');
       var wa = data.w;
       var fNameEl = document.getElementById('fName');

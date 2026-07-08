@@ -1411,9 +1411,10 @@ function applyTheme(force) {
     const want = t === 'masc' ? img.dataset.masc : img.dataset.fem;
     if (img.getAttribute('src') !== want) img.setAttribute('src', want);
   });
-  // termo do negócio conforme o tema: "salão" (rosé) ⇄ "barbearia" (azul/masc)
+  // termo do negócio conforme o SEGMENTO (salão/barbearia/petshop) — independente da cor
+  const _seg = segmentKey();
   document.querySelectorAll('[data-term-fem][data-term-masc]').forEach(el => {
-    const want = t === 'masc' ? el.dataset.termMasc : el.dataset.termFem;
+    const want = _seg === 'barbearia' ? el.dataset.termMasc : (_seg === 'petshop' ? (el.dataset.termPet || el.dataset.termFem) : el.dataset.termFem);
     if (el.textContent !== want) el.textContent = want;
   });
   document.querySelectorAll('.tsw[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
@@ -1421,18 +1422,69 @@ function applyTheme(force) {
   const tc = document.querySelector('meta[name="theme-color"]');
   if (tc) tc.setAttribute('content', t === 'masc' ? '#1d4ed8' : '#f43f8e');
 }
-// Termo do negócio conforme o tema. Passa o texto feminino (rosé, "salão") e o
-// masculino (azul, "barbearia") já com o artigo certo — "salão" é masculino e
-// "barbearia" é feminino ("do salão" → "da barbearia"). Retorna um <span> que o
-// applyTheme mantém sincronizado quando o tema muda.
-function term(fem, masc) {
-  const cur = (document.documentElement.dataset.theme === 'masc') ? masc : fem;
-  return `<span data-term-fem="${fem}" data-term-masc="${masc}">${cur}</span>`;
+// SEGMENTOS (ramos) que o BelaCaixa atende. Cada um define as PALAVRAS do negócio,
+// um ícone, a cor sugerida e um catálogo modelo opcional. O segmento é INDEPENDENTE
+// da cor: o dono escolhe o ramo (o app se adapta) e ainda pode trocar rosa/azul.
+const SEGMENTS = {
+  salao: {
+    key: 'salao', label: 'Salão de beleza', icon: '💇‍♀️', theme: 'fem',
+    defName: 'Meu salão', bare: 'salão',
+    catalog: [
+      { name: 'Corte feminino', price: 70, dur: 60 },
+      { name: 'Escova', price: 50, dur: 45 },
+      { name: 'Manicure', price: 35, dur: 40 },
+      { name: 'Pedicure', price: 40, dur: 45 },
+      { name: 'Coloração', price: 150, dur: 120 },
+    ],
+  },
+  barbearia: {
+    key: 'barbearia', label: 'Barbearia', icon: '💈', theme: 'masc',
+    defName: 'Minha barbearia', bare: 'barbearia',
+    catalog: [
+      { name: 'Corte masculino', price: 45, dur: 40 },
+      { name: 'Barba', price: 35, dur: 30 },
+      { name: 'Corte + barba', price: 70, dur: 60 },
+      { name: 'Sobrancelha', price: 20, dur: 15 },
+      { name: 'Pezinho', price: 20, dur: 15 },
+    ],
+  },
+  petshop: {
+    key: 'petshop', label: 'Petshop · Banho e tosa', icon: '🐾', theme: 'fem',
+    defName: 'Meu petshop', bare: 'petshop',
+    catalog: [
+      { name: 'Banho (porte pequeno)', price: 50, dur: 60 },
+      { name: 'Banho (porte grande)', price: 80, dur: 90 },
+      { name: 'Tosa higiênica', price: 45, dur: 45 },
+      { name: 'Tosa completa', price: 90, dur: 90 },
+      { name: 'Banho + tosa', price: 120, dur: 120 },
+      { name: 'Corte de unhas', price: 25, dur: 20 },
+    ],
+  },
+};
+const SEGMENT_ORDER = ['salao', 'barbearia', 'petshop'];
+// Segmento atual. Contas com `segment` gravado usam ele; contas antigas/landing
+// (sem segment) caem no fallback pela cor (azul=barbearia, rosa=salão) — assim nada
+// muda pra quem já usava e a landing pré-login continua igual.
+function segmentKey() {
+  const s = state && state.business && state.business.segment;
+  if (s && SEGMENTS[s]) return s;
+  const masc = (state && state.business && state.business.theme === 'masc') ||
+               (!(state && state.business) && document.documentElement.dataset.theme === 'masc');
+  return masc ? 'barbearia' : 'salao';
+}
+function curSegment() { return SEGMENTS[segmentKey()]; }
+// Termo do negócio conforme o SEGMENTO. Passa o texto de cada ramo (salão / barbearia
+// / petshop) já com o artigo certo. `pet` é opcional (cai no `fem` se não vier).
+// Retorna um <span> que o applyTheme mantém sincronizado quando o segmento muda.
+function term(fem, masc, pet) {
+  const seg = segmentKey();
+  const cur = seg === 'barbearia' ? masc : (seg === 'petshop' ? (pet || fem) : fem);
+  return `<span data-term-fem="${fem}" data-term-masc="${masc}"${pet ? ` data-term-pet="${pet}"` : ''}>${cur}</span>`;
 }
 // versão texto-puro (sem HTML) p/ nome padrão de negócio embutido em links/tokens
 function bizWordPlain(cap) {
-  const masc = (state && state.business && state.business.theme === 'masc');
-  return cap ? (masc ? 'Minha barbearia' : 'Meu salão') : (masc ? 'barbearia' : 'salão');
+  const s = curSegment();
+  return cap ? s.defName : s.bare;
 }
 function render() {
   applyTheme();
@@ -1485,7 +1537,7 @@ function notifBarHTML() {
   const resumo = Object.entries(porGrupo).map(([g, n]) => `${g}: <b>${n}</b>`).join(' · ');
   return `<div class="notif-bar" id="notifBar">
     <span style="font-size:24px">🔔</span>
-    <div style="flex:1;min-width:0"><b>${un.length} aviso(s) novo(s) no ${term('seu salão', 'sua barbearia')}</b>
+    <div style="flex:1;min-width:0"><b>${un.length} aviso(s) novo(s) no ${term('seu salão', 'sua barbearia', 'seu petshop')}</b>
       <div class="muted" style="font-size:13px;margin-top:2px">${resumo}</div></div>
     <button class="btn btn-primary btn-sm" data-act="central-avisos">Ver avisos →</button>
   </div>`;
@@ -2178,13 +2230,13 @@ function bookingLink() {
   }
   // Fallback (ex.: demonstração sem login): embute os dados no próprio link.
   const svc = (state.services || []).map(s => [s.name, s.price, s.dur || 60]);
-  const token = encodeBooking({ b: (state.business.name || bizWordPlain(true)), w: wa, s: svc, t: (state.business.theme === 'masc' ? 'masc' : 'fem') });
+  const token = encodeBooking({ b: (state.business.name || bizWordPlain(true)), w: wa, s: svc, t: (state.business.theme === 'masc' ? 'masc' : 'fem'), seg: segmentKey() });
   return bookingBaseUrl() + '#' + token;
 }
 function modalLinkAgendamento() {
   const wa = waPhone(state.business && state.business.whatsapp);
   if (!wa) {
-    openModal('🔗 Link de agendamento', `<p>Pra gerar seu link, cadastre primeiro o <b>WhatsApp ${term('do salão', 'da barbearia')}</b> — é pra lá que as clientes vão mandar os pedidos de horário.</p>`,
+    openModal('🔗 Link de agendamento', `<p>Pra gerar seu link, cadastre primeiro o <b>WhatsApp ${term('do salão', 'da barbearia', 'do petshop')}</b> — é pra lá que as clientes vão mandar os pedidos de horário.</p>`,
       `<button class="btn btn-ghost" data-close>Depois</button><button class="btn btn-primary" id="lk_cfg">Cadastrar WhatsApp agora</button>`);
     $('#lk_cfg').onclick = () => { closeModal(); modalBiz(); };
     return;
@@ -2318,13 +2370,16 @@ function modalBiz() {
   ];
   openModal('Configurações do negócio', `
     <div class="field"><label>Nome do negócio</label><input class="input" id="g_name" value="${esc(b.name)}"/></div>
+    <div class="field"><label>🏷️ Ramo do negócio <span class="muted" style="font-weight:400">(adapta os textos e a página de agendamento ao seu segmento)</span></label>
+      <select class="input" id="g_seg">${SEGMENT_ORDER.map(k => `<option value="${k}"${segmentKey() === k ? ' selected' : ''}>${SEGMENTS[k].icon} ${SEGMENTS[k].label}</option>`).join('')}</select>
+    </div>
     <div class="field"><label>🎨 Tema do painel <span class="muted" style="font-weight:400">(identidade visual do sistema)</span></label>
       <div class="theme-pick" id="g_theme">
         <div class="tp ${curTheme === 'fem' ? 'on' : ''}" data-t="fem"><div class="tp-sw" style="background:linear-gradient(120deg,#f43f8e,#9b5de5)"></div><div class="tp-name">Feminino</div><div class="tp-sub">Rosé (padrão)</div></div>
         <div class="tp ${curTheme === 'masc' ? 'on' : ''}" data-t="masc"><div class="tp-sw" style="background:linear-gradient(120deg,#2563eb,#1e3a8a)"></div><div class="tp-name">Masculino</div><div class="tp-sub">Azul</div></div>
       </div>
     </div>
-    <div class="field"><label>📲 WhatsApp ${term('do salão', 'da barbearia')} <span class="muted" style="font-weight:400">(pra receber os agendamentos das clientes)</span></label><input class="input" id="g_wa" inputmode="tel" placeholder="Ex.: (22) 99244-5995" value="${esc(b.whatsapp || '')}"/></div>
+    <div class="field"><label>📲 WhatsApp ${term('do salão', 'da barbearia', 'do petshop')} <span class="muted" style="font-weight:400">(pra receber os agendamentos das clientes)</span></label><input class="input" id="g_wa" inputmode="tel" placeholder="Ex.: (22) 99244-5995" value="${esc(b.whatsapp || '')}"/></div>
     <div class="field"><label>🕐 Fuso horário <span class="muted" style="font-weight:400">(base do "hoje" no caixa e na agenda)</span></label>
       <select class="input" id="g_tz">${tzOpts.map(([v, l]) => `<option value="${v}"${tz === v ? ' selected' : ''}>${l}</option>`).join('')}</select>
       <p class="muted" style="font-size:12.5px;margin:6px 2px 0">🕐 Agora no fuso escolhido: <b id="g_tznow">—</b></p>
@@ -2379,6 +2434,7 @@ function modalBiz() {
   const tzTimer = setInterval(() => { if (!$('#g_tznow')) return clearInterval(tzTimer); tzNow(); }, 20000);
   $('#g_save').onclick = () => {
     const _th = $('#g_theme .tp.on'); b.theme = _th && _th.dataset.t === 'masc' ? 'masc' : 'fem';
+    const _sg = $('#g_seg'); if (_sg && SEGMENTS[_sg.value]) b.segment = _sg.value;   // ramo do negócio (adapta os textos)
     b.name = $('#g_name').value.trim() || b.name; b.reserveTarget = +$('#g_res').value || b.reserveTarget; b.monthlyGoal = +$('#g_goal').value || b.monthlyGoal;
     b.whatsapp = waPhone($('#g_wa').value);
     b.timezone = $('#g_tz').value || DEFAULT_TZ;
@@ -2763,6 +2819,14 @@ async function enterApp() {
   if (params.get('assinatura') === 'sucesso' && !subActive()) { $('#viewRoot').innerHTML = '<div class="empty"><span class="e-ico">⏳</span>Confirmando seu pagamento…</div>'; await pollSub(8); }
   if (params.get('assinatura')) { const ok = params.get('assinatura') === 'sucesso' && subActive(); history.replaceState({}, '', location.pathname); if (ok) toast('Assinatura ativada! 🎉', 'ok'); }
   if (!hasAccess() && !isAdmin()) { showSubGate(); return; }   // o administrador entra sem pagar
+  // 1º acesso: escolher o RAMO do negócio (o app se adapta). Admin/contas antigas já seguem.
+  if (needsSegmentChoice()) { showSegmentPicker(finishEnterApp); return; }
+  finishEnterApp();
+}
+function finishEnterApp() {
+  $('#app').hidden = false; $('#landing').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true;
+  const seg = document.getElementById('segScreen'); if (seg) seg.hidden = true;
+  document.body.style.background = 'var(--bg)';
   const em = $('#sbUserEmail'); if (em) em.textContent = currentUser.email;
   updatePlanChip();
   const adm = $('#navAdmin'); if (adm) adm.hidden = !isAdmin();
@@ -2770,6 +2834,51 @@ async function enterApp() {
   subscribeTenantRealtime();  // reservas do link aparecem na agenda sozinhas (sem recarregar)
   render(); window.scrollTo(0, 0);
   consumeBookingDeepLink();   // se veio de um link "1 toque p/ agendar", abre o modal já preenchido
+}
+/* ---------------- ESCOLHA DE RAMO (segmento) — 1º acesso ---------------- */
+function needsSegmentChoice() {
+  return !demoMode && !!state && !!state.business && !state.business.segment && !isAdmin();
+}
+function showSegmentPicker(onDone) {
+  let el = document.getElementById('segScreen');
+  if (!el) { el = document.createElement('div'); el.id = 'segScreen'; document.body.appendChild(el); }
+  el.hidden = false;
+  el.innerHTML = `<div class="seg-wrap"><div class="seg-card">
+    <div class="seg-logo">${brandIco(52)}</div>
+    <h2>Bem-vindo(a) ao BelaCaixa! 👋</h2>
+    <p class="seg-sub">O que você faz? Escolha seu ramo — o app já se adapta a você.<br><span class="muted">Dá pra mudar depois nas Configurações.</span></p>
+    <div class="seg-list">${SEGMENT_ORDER.map(k => { const s = SEGMENTS[k]; return `<button type="button" class="seg-opt" data-seg="${k}"><span class="seg-ic">${s.icon}</span><span class="seg-name">${s.label}</span><span class="seg-arrow">›</span></button>`; }).join('')}</div>
+  </div></div>`;
+  $('#app').hidden = true; $('#landing').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true;
+  document.body.style.background = 'var(--bg)';
+  el.querySelectorAll('.seg-opt').forEach(b => b.onclick = () => chooseSegment(b.dataset.seg, { applyColor: true, onDone }));
+  applyTheme();
+}
+function chooseSegment(key, opts) {
+  opts = opts || {};
+  const s = SEGMENTS[key]; if (!s || !state) return;
+  state.business.segment = key;
+  if (opts.applyColor) { state.business.theme = s.theme; try { localStorage.setItem(THEME_KEY, s.theme); localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {} }
+  applyTheme();
+  save();
+  const el = document.getElementById('segScreen'); if (el) el.hidden = true;
+  const proceed = opts.onDone || (() => {});
+  // catálogo modelo opcional — só se o segmento tiver e a conta ainda estiver sem serviços
+  if (s.catalog && s.catalog.length && !(state.services && state.services.length)) offerModelCatalog(key, proceed);
+  else proceed();
+}
+function offerModelCatalog(key, onDone) {
+  const s = SEGMENTS[key];
+  let fired = false;
+  const done = () => { if (fired) return; fired = true; closeModal(); if (onDone) onDone(); };
+  openModal(`${s.icon} Catálogo modelo`, `
+    <p>Quer começar com um <b>catálogo de exemplo de ${esc(s.label.toLowerCase())}</b>? É só pra não começar do zero — você <b>edita, muda o preço ou apaga</b> tudo depois.</p>
+    <div class="seg-cat">${s.catalog.map(c => `<div class="seg-cat-row"><span>${esc(c.name)}</span><b>${fmt(c.price)} · ${c.dur}min</b></div>`).join('')}</div>
+    <p class="muted" style="font-size:12.5px;margin-top:10px">Se preferir, começa 100% em branco.</p>
+  `, `<button class="btn btn-ghost" id="cat_skip">Começar do zero</button><button class="btn btn-primary" id="cat_use">Usar este modelo</button>`);
+  $('#cat_use').onclick = () => { s.catalog.forEach(c => state.services.push({ id: uid(), name: c.name, price: c.price, dur: c.dur, mat: [] })); save(); toast('Catálogo modelo adicionado ✨', 'ok'); done(); };
+  $('#cat_skip').onclick = done;
+  const x = document.querySelector('#modalRoot .modal-x'); if (x) x.addEventListener('click', done);
 }
 function exitApp() { $('#app').hidden = true; $('#authScreen').hidden = true; $('#subScreen').hidden = true; $('#landing').hidden = false; document.body.style.background = ''; window.scrollTo(0, 0); }
 
