@@ -1,3 +1,10 @@
-﻿Segmento: aplicar cor sugerida so em conta nova/vazia (nao troca cor de quem ja tem dados)
+﻿Tema VERDE (petshop) + tipo de negocio no cadastro com icone colorido
+
+- 3a paleta de cor (verde) p/ petshop; logos verdes (icon/larga/compacta) geradas
+- Cadastro: seletor de tipo de negocio (Salao rosa / Barbearia azul / Petshop verde) com icone SVG na cor do ramo; escolha grava segmento + cor
+- Cada ramo com sua cor: salao=rosa, barbearia=azul, petshop=verde (app todo + logo)
+- Configuracoes: 3 temas (Rosa/Azul/Verde)
+- Catalogo modelo unificado (maybeOfferCatalog) vale p/ cadastro e 1o acesso
+- agendar.html + booking-info suportam tema verde
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>

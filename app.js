@@ -1434,7 +1434,7 @@ const SEGMENTS = {
   salao: {
     key: 'salao', label: 'Salão · Nails · Sobrancelha', icon: '💅', theme: 'fem', color: '#f43f8e',
     svg: '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><rect x="9.2" y="2" width="5.6" height="3.2" rx="1" fill="#f43f8e"/><rect x="8.4" y="5.4" width="7.2" height="3.6" rx="1" fill="#f9a8cf"/><path d="M8.2 9h7.6a1 1 0 0 1 1 1v9.5A1.5 1.5 0 0 1 15.3 21H8.7a1.5 1.5 0 0 1-1.5-1.5V10a1 1 0 0 1 1-1z" fill="#f43f8e"/><rect x="8.9" y="12.4" width="6.2" height="3.4" rx="1" fill="#fff" opacity=".5"/></svg>',
-    defName: 'Meu salão', bare: 'salão',
+    defName: 'Meu salão', bare: 'salão', namePh: 'Ex.: Studio Bella Unhas',
     catalog: [
       { name: 'Corte feminino', price: 70, dur: 60 },
       { name: 'Escova', price: 50, dur: 45 },
@@ -1446,7 +1446,7 @@ const SEGMENTS = {
   barbearia: {
     key: 'barbearia', label: 'Barbearia', icon: '💈', theme: 'masc', color: '#1d4ed8',
     svg: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#1d4ed8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>',
-    defName: 'Minha barbearia', bare: 'barbearia',
+    defName: 'Minha barbearia', bare: 'barbearia', namePh: 'Ex.: Barbearia do João',
     catalog: [
       { name: 'Corte masculino', price: 45, dur: 40 },
       { name: 'Barba', price: 35, dur: 30 },
@@ -1458,7 +1458,7 @@ const SEGMENTS = {
   petshop: {
     key: 'petshop', label: 'Petshop · Banho e tosa', icon: '🐾', theme: 'pet', color: '#16a34a',
     svg: '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="#16a34a"><ellipse cx="6" cy="11" rx="2.1" ry="2.7"/><ellipse cx="18" cy="11" rx="2.1" ry="2.7"/><ellipse cx="9.6" cy="6.7" rx="2" ry="2.6"/><ellipse cx="14.4" cy="6.7" rx="2" ry="2.6"/><path d="M12 12.4c-2.7 0-5 1.9-5 4.2 0 1.8 1.5 2.8 3.1 2.8 .95 0 1.4-.35 1.9-.35s.95 .35 1.9 .35c1.6 0 3.1-1 3.1-2.8 0-2.3-2.3-4.2-5-4.2z"/></svg>',
-    defName: 'Meu petshop', bare: 'petshop',
+    defName: 'Meu petshop', bare: 'petshop', namePh: 'Ex.: Pet Amore Banho e Tosa',
     catalog: [
       { name: 'Banho (porte pequeno)', price: 50, dur: 60 },
       { name: 'Banho (porte grande)', price: 80, dur: 90 },
@@ -2559,9 +2559,12 @@ function wireAuth() {
   const segBox = $('#au_seg');
   if (segBox) {
     segBox.innerHTML = SEGMENT_ORDER.map((k, i) => { const s = SEGMENTS[k]; return `<button type="button" class="segp${i === 0 ? ' on' : ''}" data-seg="${k}" data-t="${s.theme}" style="--segc:${s.color}"><span class="segp-ic">${s.svg}</span><span class="segp-tx">${s.label}</span></button>`; }).join('');
+    const setBizPh = k => { const inp = $('#auBiz'); if (inp && SEGMENTS[k] && SEGMENTS[k].namePh) inp.placeholder = SEGMENTS[k].namePh; };
+    setBizPh(SEGMENT_ORDER[0]);   // exemplo do nome já combina com o ramo pré-selecionado
     segBox.querySelectorAll('.segp').forEach(b => b.onclick = () => {
       segBox.querySelectorAll('.segp').forEach(x => x.classList.toggle('on', x === b));
       applyTheme(b.dataset.t);
+      setBizPh(b.dataset.seg);   // o placeholder do "Nome do seu negócio" acompanha o ramo
       try { localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
       const note = $('#authThemeNote'); if (note) note.classList.remove('first');
     });
