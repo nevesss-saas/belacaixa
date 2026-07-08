@@ -2858,7 +2858,10 @@ function chooseSegment(key, opts) {
   opts = opts || {};
   const s = SEGMENTS[key]; if (!s || !state) return;
   state.business.segment = key;
-  if (opts.applyColor) { state.business.theme = s.theme; try { localStorage.setItem(THEME_KEY, s.theme); localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {} }
+  // Sugere a cor do ramo — mas SÓ em conta nova/vazia. Conta que já tem dados mantém
+  // a cor atual (não surpreende quem já escolheu); ela troca depois nas Configurações.
+  const fresh = !((state.services && state.services.length) || (state.transactions && state.transactions.length) || (state.clients && state.clients.length) || (state.appointments && state.appointments.length));
+  if (opts.applyColor && fresh) { state.business.theme = s.theme; try { localStorage.setItem(THEME_KEY, s.theme); localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {} }
   applyTheme();
   save();
   const el = document.getElementById('segScreen'); if (el) el.hidden = true;
