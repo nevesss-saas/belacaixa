@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260708b" />
+  <link rel="stylesheet" href="styles.css?v=20260708pal" />
   <link rel="icon" href="logo-compacta.png?v=20260704e">
   <!-- PWA (app instalável) -->
   <link rel="manifest" href="manifest.json?v=1">
@@ -315,8 +315,10 @@
         <div class="auth-brand"><img class="brand-wide" src="logo-larga.png?v=20260706f" data-fem="logo-larga.png?v=20260706f" data-masc="logo-larga-masc.png?v=20260706i" data-pet="logo-larga-pet.png?v=20260708a" data-ink="logo-larga-ink.png?v=20260708c" alt="BelaCaixa"></div>
         <div class="auth-theme-note first" id="authThemeNote">
           <div class="atn-head">🎯 Qual é o seu negócio?</div>
-          <div class="atn-sub">O BelaCaixa se adapta a você — cor, ícone e textos combinam com o seu ramo. Dá pra trocar depois.</div>
+          <div class="atn-sub">O BelaCaixa se adapta a você — ícone e textos combinam com o seu ramo. Dá pra trocar depois.</div>
           <div class="seg-pick" id="au_seg"></div>
+          <div class="atn-colorlbl">🎨 Cor do painel <span>— escolha qualquer uma</span></div>
+          <div class="tsw-row" id="au_color"></div>
         </div>
         <div class="seg auth-tabs">
           <button type="button" class="on" data-auth-tab="login">Entrar</button>
@@ -355,7 +357,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js?v=20260704c"></script>
-  <script src="app.js?v=20260708i"></script>
+  <script src="app.js?v=20260708pal"></script>
   <script>
     /* PWA: registra o service worker (offline + abrir como app). Silencioso se falhar. */
     if ('serviceWorker' in navigator) {

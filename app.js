@@ -1418,8 +1418,43 @@ function updatePrivacyEye() {
 }
 
 const THEME_KEY = 'belacaixa_theme', THEME_CHOSEN_KEY = 'belacaixa_theme_chosen';
-const VALID_THEMES = ['fem', 'masc', 'pet', 'ink'];   // rosa / azul / verde / preto
-const THEME_COLOR = { fem: '#f43f8e', masc: '#1d4ed8', pet: '#16a34a', ink: '#111827' };
+// PALETA COMPLETA de cores do painel — qualquer profissão pode escolher qualquer cor.
+// name = rótulo mostrado | c = cor sólida (barra do sistema/PWA) | grad = prévia do swatch.
+// O CSS tem um bloco html[data-theme="KEY"] para cada uma destas chaves.
+const THEME_META = {
+  fem:      { name: 'Rosa',     c: '#f43f8e', grad: 'linear-gradient(135deg,#f9a8d4,#f43f8e)' },
+  magenta:  { name: 'Pink',     c: '#db2777', grad: 'linear-gradient(135deg,#f472b6,#db2777)' },
+  roxo:     { name: 'Roxo',     c: '#9333ea', grad: 'linear-gradient(135deg,#c084fc,#9333ea)' },
+  indigo:   { name: 'Índigo',   c: '#4f46e5', grad: 'linear-gradient(135deg,#818cf8,#4f46e5)' },
+  masc:     { name: 'Azul',     c: '#1d4ed8', grad: 'linear-gradient(135deg,#60a5fa,#1d4ed8)' },
+  teal:     { name: 'Turquesa', c: '#0d9488', grad: 'linear-gradient(135deg,#5eead4,#0d9488)' },
+  pet:      { name: 'Verde',    c: '#16a34a', grad: 'linear-gradient(135deg,#4ade80,#16a34a)' },
+  dourado:  { name: 'Dourado',  c: '#d97706', grad: 'linear-gradient(135deg,#fbbf24,#d97706)' },
+  laranja:  { name: 'Laranja',  c: '#f97316', grad: 'linear-gradient(135deg,#fb923c,#f97316)' },
+  vermelho: { name: 'Vermelho', c: '#dc2626', grad: 'linear-gradient(135deg,#f87171,#dc2626)' },
+  grafite:  { name: 'Grafite',  c: '#475569', grad: 'linear-gradient(135deg,#94a3b8,#475569)' },
+  ink:      { name: 'Preto',    c: '#111827', grad: 'linear-gradient(135deg,#4b5563,#111827)' },
+};
+const VALID_THEMES = Object.keys(THEME_META);   // fem/magenta/roxo/.../ink — em sincronia com o CSS
+const THEME_COLOR = Object.fromEntries(Object.entries(THEME_META).map(([k, v]) => [k, v.c]));
+const themeName = k => (THEME_META[k] || THEME_META.fem).name;
+// HTML dos swatches de cor (bolinhas). `active` marca a que está selecionada.
+function themeSwatchesHTML(active) {
+  return VALID_THEMES.map(k => `<button type="button" class="tsw${k === active ? ' on' : ''}" data-t="${k}" title="${THEME_META[k].name}" aria-label="Tema ${THEME_META[k].name}" style="--sw:${THEME_META[k].grad}"></button>`).join('');
+}
+// Preenche um container com todos os swatches e liga o clique (aplica a cor na hora).
+function fillThemeSwatches(sel, opts) {
+  opts = opts || {};
+  const box = (typeof sel === 'string') ? document.querySelector(sel) : sel;
+  if (!box) return;
+  box.innerHTML = themeSwatchesHTML(savedThemePref() || (state && state.business && state.business.theme) || 'fem');
+  box.querySelectorAll('.tsw').forEach(b => b.onclick = () => {
+    applyTheme(b.dataset.t);   // aplica + sincroniza o .on de TODOS os swatches (ver applyTheme)
+    try { localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
+    const note = document.querySelector('#authThemeNote'); if (note) note.classList.remove('first');
+    if (opts.toast) toast('Cor ' + themeName(b.dataset.t) + ' aplicada! 🎨', 'ok');
+  });
+}
 function savedThemePref() { try { const t = localStorage.getItem(THEME_KEY); return VALID_THEMES.includes(t) ? t : null; } catch (e) { return null; } }
 function themeChosen() { try { return !!localStorage.getItem(THEME_CHOSEN_KEY); } catch (e) { return false; } }
 function applyTheme(force) {
@@ -2426,12 +2461,7 @@ function modalBiz() {
       <select class="input" id="g_seg">${SEGMENT_ORDER.map(k => `<option value="${k}"${segmentKey() === k ? ' selected' : ''}>${SEGMENTS[k].icon} ${SEGMENTS[k].label}</option>`).join('')}</select>
     </div>
     <div class="field"><label>🎨 Tema do painel <span class="muted" style="font-weight:400">(identidade visual do sistema)</span></label>
-      <div class="theme-pick" id="g_theme">
-        <div class="tp ${curTheme === 'fem' ? 'on' : ''}" data-t="fem"><div class="tp-sw" style="background:linear-gradient(120deg,#f43f8e,#9b5de5)"></div><div class="tp-name">Rosa</div><div class="tp-sub">Beleza / Nails</div></div>
-        <div class="tp ${curTheme === 'masc' ? 'on' : ''}" data-t="masc"><div class="tp-sw" style="background:linear-gradient(120deg,#2563eb,#1e3a8a)"></div><div class="tp-name">Azul</div><div class="tp-sub">Barbearia</div></div>
-        <div class="tp ${curTheme === 'pet' ? 'on' : ''}" data-t="pet"><div class="tp-sw" style="background:linear-gradient(120deg,#22c55e,#047857)"></div><div class="tp-name">Verde</div><div class="tp-sub">Petshop</div></div>
-        <div class="tp ${curTheme === 'ink' ? 'on' : ''}" data-t="ink"><div class="tp-sw" style="background:linear-gradient(120deg,#374151,#000)"></div><div class="tp-name">Preto</div><div class="tp-sub">Tattoo</div></div>
-      </div>
+      <div class="tsw-row" id="g_theme">${themeSwatchesHTML(curTheme)}</div>
     </div>` : '';
   openModal('Configurações do negócio', `
     <div class="field"><label>Nome do negócio</label><input class="input" id="g_name" value="${esc(b.name)}"/></div>
@@ -2473,7 +2503,7 @@ function modalBiz() {
   `, `<button class="btn btn-ghost" data-close>Cancelar</button><button class="btn btn-primary" id="g_save">Salvar</button>`);
   bindPinSection();
   const gTheme = $('#g_theme');
-  if (gTheme) gTheme.querySelectorAll('.tp').forEach(c => c.onclick = () => { gTheme.querySelectorAll('.tp').forEach(x => x.classList.toggle('on', x === c)); applyTheme(c.dataset.t); });
+  if (gTheme) gTheme.querySelectorAll('.tsw').forEach(c => c.onclick = () => applyTheme(c.dataset.t));   // applyTheme já sincroniza o .on de todos os swatches
   $('#g_days').querySelectorAll('button[data-d]').forEach(btn => btn.onclick = () => { btn.classList.toggle('btn-primary'); btn.classList.toggle('btn-ghost'); });
   // almoço: liga/desliga a caixa, alterna "dias específicos", e chips clicáveis
   const lunchBox = $('#g_lunch_box'), lunchDaysRow = $('#g_lunch_days'), lunchScope = $('#g_lunch_scope');
@@ -2491,7 +2521,7 @@ function modalBiz() {
   $('#g_tz').onchange = tzNow; tzNow();
   const tzTimer = setInterval(() => { if (!$('#g_tznow')) return clearInterval(tzTimer); tzNow(); }, 20000);
   $('#g_save').onclick = () => {
-    const _th = $('#g_theme .tp.on'); if (_th && VALID_THEMES.includes(_th.dataset.t)) b.theme = _th.dataset.t;   // só admin/demo edita o tema; conta comum mantém o que escolheu no cadastro
+    const _th = $('#g_theme .tsw.on'); if (_th && VALID_THEMES.includes(_th.dataset.t)) b.theme = _th.dataset.t;   // cor escolhida na paleta
     const _sg = $('#g_seg'); if (_sg && SEGMENTS[_sg.value]) b.segment = _sg.value;   // ramo do negócio (adapta os textos)
     b.name = $('#g_name').value.trim() || b.name; b.reserveTarget = +$('#g_res').value || b.reserveTarget; b.monthlyGoal = +$('#g_goal').value || b.monthlyGoal;
     b.whatsapp = waPhone($('#g_wa').value);
@@ -2574,11 +2604,9 @@ function showAuth(mode) {
   window.scrollTo(0, 0);
 }
 function refreshAuthTheme() {
-  const saved = savedThemePref() || 'fem';
-  applyTheme(saved);
-  const box = $('#au_theme'); if (box) box.querySelectorAll('.tp').forEach(c => c.classList.toggle('on', c.dataset.t === saved));
+  applyTheme(savedThemePref() || 'fem');   // aplica a cor salva e sincroniza o .on de todos os swatches
   const note = $('#authThemeNote'); if (note) note.classList.toggle('first', !themeChosen());
-  if (!themeChosen()) toast('Rosa ou Azul? Toque na cor que você prefere logo acima. ↑', 'info');
+  if (!themeChosen()) toast('🎨 Escolha o ramo e a cor do seu painel acima antes de entrar. ↑', 'info');
 }
 function setAuthMode(mode) {
   authMode = mode;
@@ -2622,6 +2650,7 @@ function wireAuth() {
       const note = $('#authThemeNote'); if (note) note.classList.remove('first');
     });
   }
+  fillThemeSwatches('#au_color', { toast: true });   // paleta COMPLETA de cores — qualquer profissão escolhe qualquer cor
 }
 async function onAuthSubmit(e) {
   e.preventDefault();
@@ -2637,10 +2666,13 @@ async function onAuthSubmit(e) {
       if (!data.session) { const r = await sb.auth.signInWithPassword({ email, password: pass }); if (r.error) throw r.error; currentUser = r.data.user; }
       else currentUser = data.user;
       await cloudLoad();
-      // ramo escolhido no cadastro → define o segmento E a cor do painel (rosa/azul/verde)
+      // ramo define o segmento (textos/ícone); a COR é a que a pessoa escolheu na paleta
+      // (qualquer cor p/ qualquer profissão). Se não mexeu na cor, usa a do ramo escolhido.
       const selSeg = document.querySelector('#au_seg .segp.on');
       const _seg = selSeg && SEGMENTS[selSeg.dataset.seg] ? selSeg.dataset.seg : null;
-      const _th = _seg ? SEGMENTS[_seg].theme : savedThemePref();
+      const selColor = document.querySelector('#au_color .tsw.on');
+      const _th = (selColor && VALID_THEMES.includes(selColor.dataset.t)) ? selColor.dataset.t
+                : (savedThemePref() || (_seg ? SEGMENTS[_seg].theme : null));
       if (state) {
         if (biz) state.business.name = biz;
         if (_seg) state.business.segment = _seg;
