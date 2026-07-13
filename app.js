@@ -2457,16 +2457,20 @@ function modalBiz() {
     ['America/Rio_Branco', 'Acre (UTC−5) — AC e oeste do AM'],
     ['America/Noronha', 'Fernando de Noronha (UTC−2)'],
   ];
-  // Ramo + tema (identidade visual) só aparecem pra conta do ADMIN (apresentação).
-  // Conta comum já escolheu o ramo/cor no cadastro; a demo mostra a visão do cliente (sem esses campos).
-  const showIdent = isAdmin();
-  const identFields = showIdent ? `
+  // O "Ramo do negócio" (textos/agenda) segue só pra conta do ADMIN.
+  // A COR do painel agora pode ser trocada por QUALQUER conta logada — inclusive quem
+  // já tinha login. (A demonstração não persiste, então não mostra o seletor.)
+  const showSeg = isAdmin();
+  const showTheme = !demoMode && !!currentUser;
+  const segField = showSeg ? `
     <div class="field"><label>🏷️ Ramo do negócio <span class="muted" style="font-weight:400">(adapta os textos e a página de agendamento ao seu segmento)</span></label>
       <select class="input" id="g_seg">${SEGMENT_ORDER.map(k => `<option value="${k}"${segmentKey() === k ? ' selected' : ''}>${SEGMENTS[k].icon} ${SEGMENTS[k].label}</option>`).join('')}</select>
-    </div>
-    <div class="field"><label>🎨 Tema do painel <span class="muted" style="font-weight:400">(identidade visual do sistema)</span></label>
+    </div>` : '';
+  const themeField = showTheme ? `
+    <div class="field"><label>🎨 Cor do painel <span class="muted" style="font-weight:400">(escolha qualquer uma — vale pra qualquer profissão)</span></label>
       <div class="tsw-row" id="g_theme">${themeSwatchesHTML(curTheme)}</div>
     </div>` : '';
+  const identFields = segField + themeField;
   openModal('Configurações do negócio', `
     <div class="field"><label>Nome do negócio</label><input class="input" id="g_name" value="${esc(b.name)}"/></div>
     ${identFields}
