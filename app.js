@@ -1453,6 +1453,7 @@ function fillThemeSwatches(sel, opts) {
     applyTheme(b.dataset.t);   // aplica + sincroniza o .on de TODOS os swatches (ver applyTheme)
     try { localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
     const note = document.querySelector('#authThemeNote'); if (note) note.classList.remove('first');
+    if (opts.persist && state && state.business) { state.business.theme = b.dataset.t; save(); }   // conta logada: grava a cor na hora
     if (opts.toast) toast('Cor ' + themeName(b.dataset.t) + ' aplicada! 🎨', 'ok');
   });
 }
@@ -3033,6 +3034,7 @@ function demoSignup() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   applyTheme(savedThemePref() || 'fem');   // reflete o tema escolhido já na landing/login
+  fillThemeSwatches('#sbTheme', { persist: true, toast: true });   // atalho de cor na barra lateral (conta logada)
   document.querySelectorAll('#lpTheme .tsw').forEach(b => b.onclick = () => {
     applyTheme(b.dataset.t);
     try { localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
