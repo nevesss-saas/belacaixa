@@ -1418,6 +1418,7 @@ function updatePrivacyEye() {
 }
 
 const THEME_KEY = 'belacaixa_theme', THEME_CHOSEN_KEY = 'belacaixa_theme_chosen';
+const LOGO_VER = '20260708pal';   // cache-busting das logos geradas por cor (convenção logo-XXXX-<cor>.png)
 // PALETA COMPLETA de cores do painel — qualquer profissão pode escolher qualquer cor.
 // name = rótulo mostrado | c = cor sólida (barra do sistema/PWA) | grad = prévia do swatch.
 // O CSS tem um bloco html[data-theme="KEY"] para cada uma destas chaves.
@@ -1462,11 +1463,14 @@ function applyTheme(force) {
   if (!VALID_THEMES.includes(t)) t = 'fem';
   document.documentElement.setAttribute('data-theme', t);
   try { localStorage.setItem(THEME_KEY, t); if (!force) localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
-  // logo conforme a cor: rosa (data-fem) / azul (data-masc) / verde (data-pet) / preto (data-ink);
-  // cai no data-fem se a variante da cor não existir
+  // logo conforme a cor. As 4 originais (fem/masc/pet/ink) têm data-attr próprio com ?v;
+  // as demais cores usam a CONVENÇÃO logo-XXXX-<cor>.png (geradas por matiz da base rosa).
   document.querySelectorAll('img[data-fem][data-masc]').forEach(img => {
-    const want = img.dataset[t] || img.dataset.fem;
-    if (img.getAttribute('src') !== want) img.setAttribute('src', want);
+    let want;
+    if (t === 'fem') want = img.dataset.fem;
+    else if (img.dataset[t]) want = img.dataset[t];
+    else { const base = (img.dataset.fem || img.getAttribute('src') || '').split('?')[0]; want = base.replace(/\.png$/i, '-' + t + '.png') + '?v=' + LOGO_VER; }
+    if (want && img.getAttribute('src') !== want) img.setAttribute('src', want);
   });
   // termo do negócio (in-app) conforme o SEGMENTO — escalável por kind, independente da cor
   document.querySelectorAll('[data-seg-term]').forEach(el => {
