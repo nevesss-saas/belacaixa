@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260708pal4" />
+  <link rel="stylesheet" href="styles.css?v=20260708pal5" />
   <link rel="icon" href="logo-compacta.png?v=20260704e">
   <!-- PWA (app instalável) -->
   <link rel="manifest" href="manifest.json?v=1">
@@ -199,9 +199,14 @@
       <div class="sb-plan">
         <span class="plan-chip" id="sbPlanChip">Plano</span>
         <p id="sbUserEmail">Seu MVP está ativo ✨</p>
-        <div class="sb-theme">
-          <span class="sb-theme-lbl">🎨 Cor do painel</span>
-          <div class="tsw-row" id="sbTheme"></div>
+        <div class="sb-theme" id="sbThemeWrap">
+          <button type="button" class="sb-theme-toggle" id="sbThemeToggle" aria-expanded="false">
+            <span class="sb-tt-dot"></span>
+            <span class="sb-tt-lbl">🎨 Cor do painel</span>
+            <span class="sb-tt-name" id="sbThemeName">Rosa</span>
+            <span class="sb-tt-chev">▾</span>
+          </button>
+          <div class="sb-theme-panel"><div class="tsw-row" id="sbTheme"></div></div>
         </div>
         <div class="row" style="gap:8px">
           <button class="btn btn-ghost btn-sm" data-exit>← Site</button>
@@ -361,7 +366,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js?v=20260704c"></script>
-  <script src="app.js?v=20260708pal4"></script>
+  <script src="app.js?v=20260708pal5"></script>
   <script>
     /* PWA: registra o service worker (offline + abrir como app). Silencioso se falhar. */
     if ('serviceWorker' in navigator) {

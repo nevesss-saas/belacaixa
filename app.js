@@ -47,9 +47,28 @@ const fmtDate = iso => { const [y, m, d] = iso.split('-'); return `${d}/${m}`; }
 const fmtDateFull = iso => { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; };
 const dayName = iso => ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][new Date(iso + 'T12:00').getDay()];
 const initials = n => n.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
-const AVCOLORS = ['#f43f8e', '#9b5de5', '#00b389', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6', '#06b6d4'];
-const AVCOLORS_MASC = ['#1d4ed8', '#1e3a8a', '#00b389', '#f59e0b', '#3b82f6', '#0891b2', '#334155', '#06b6d4'];
-const avColor = s => { const a = document.documentElement.dataset.theme === 'masc' ? AVCOLORS_MASC : AVCOLORS; return a[[...s].reduce((x, c) => x + c.charCodeAt(0), 0) % a.length]; };
+// matiz (0-360) de uma cor hex — usado pra derivar a paleta de avatares a partir do TEMA
+function hexToHue(hex) {
+  const m = String(hex).replace('#', '');
+  const r = parseInt(m.slice(0, 2), 16) / 255, g = parseInt(m.slice(2, 4), 16) / 255, b = parseInt(m.slice(4, 6), 16) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
+  if (d) { if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
+  return h;
+}
+// cor do avatar deriva do TEMA atual: cada cliente ganha um tom na FAMÍLIA da cor escolhida
+// (varia matiz/luminosidade pra continuarem distinguíveis). Assim a agenda combina com o tema.
+const avColor = s => {
+  const t = document.documentElement.dataset.theme || 'fem';
+  const base = (typeof THEME_COLOR !== 'undefined' && THEME_COLOR[t]) || '#f43f8e';
+  const hash = [...String(s)].reduce((x, c) => x + c.charCodeAt(0), 0);
+  if (t === 'ink' || t === 'grafite') {                 // temas neutros: tons de cinza/ardósia
+    const l = 34 + (hash % 5) * 7;
+    return `hsl(${t === 'ink' ? 228 : 215} 13% ${l}%)`;
+  }
+  const h = (hexToHue(base) + ((hash % 5) - 2) * 16 + 360) % 360;   // ±32° em torno da cor do tema
+  const l = 46 + ((hash >> 2) % 4) * 5;                             // 46%..61%
+  return `hsl(${h.toFixed(0)} 62% ${l}%)`;
+};
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -920,15 +939,39 @@ VIEWS.agenda = {
       <div><h4>Sugestão automática de horário</h4><p>O próximo encaixe livre é <b>${nextSlot.full}</b>. Quer agendar agora?</p>
       <button class="btn btn-soft btn-sm" style="margin-top:8px" data-act="new-agenda">Usar este horário →</button></div></div>
 
+    ${up.length ? `<div class="ag-search mt"><span class="ag-search-ico">🔍</span><input type="text" id="agSearch" class="input" placeholder="Buscar cliente na agenda…" autocomplete="off" spellcheck="false"><button type="button" class="ag-search-clear" id="agSearchClear" title="Limpar busca" hidden>×</button></div>` : ''}
     ${Object.keys(byDate).length ? Object.entries(byDate).map(([date, list]) => `
-      <div class="card mt">
+      <div class="card mt ag-day">
         <div class="section-head"><h2>${date === todayISO() ? '🔆 Hoje' : dayName(date) + ', ' + fmtDateFull(date)}</h2><span class="muted">${list.length} atend.</span></div>
         ${list.sort((a, b) => a.time.localeCompare(b.time)).map(apptRow).join('')}
-      </div>`).join('') : `<div class="card mt"><div class="empty"><span class="e-ico">📭</span>Nenhum atendimento agendado. Que tal divulgar seus horários?</div></div>`}`;
+      </div>`).join('') : `<div class="card mt"><div class="empty"><span class="e-ico">📭</span>Nenhum atendimento agendado. Que tal divulgar seus horários?</div></div>`}
+    <div class="card mt" id="agNoRes" hidden><div class="empty"><span class="e-ico">🔍</span>Nenhum cliente encontrado com esse nome.</div></div>`;
   },
   init() {
     // agendamento automático é do GOLD: sem ele, o convite aparece toda vez que a agenda abre
     if (!autoAgendaOk()) modalGoldAgenda();
+    // filtro de busca por cliente: esconde as linhas que não batem e some com o dia vazio
+    const inp = document.querySelector('#agSearch'), clr = document.querySelector('#agSearchClear'), noRes = document.querySelector('#agNoRes');
+    if (inp) {
+      const apply = () => {
+        const q = inp.value.trim().toLowerCase();
+        if (clr) clr.hidden = !q;
+        let anyVisible = false;
+        document.querySelectorAll('#viewRoot .ag-day').forEach(card => {
+          let vis = 0;
+          card.querySelectorAll('.appt-row').forEach(row => {
+            const show = !q || (row.dataset.name || '').includes(q);
+            row.style.display = show ? '' : 'none';
+            if (show) vis++;
+          });
+          card.style.display = vis ? '' : 'none';
+          if (vis) anyVisible = true;
+        });
+        if (noRes) noRes.hidden = !(q && !anyVisible);
+      };
+      inp.oninput = apply;
+      if (clr) clr.onclick = () => { inp.value = ''; apply(); inp.focus(); };
+    }
   }
 };
 function waPhone(raw) {
@@ -948,9 +991,9 @@ function apptRow(a) {
   const dataBR = a.date.split('-').reverse().join('/');
   // pedido feito pelo link público, ainda aguardando você aceitar (horário já travado pras outras)
   if (a.pending && a.source === 'link') {
-    return `<div class="row between appt-row" style="padding:12px;border-bottom:1px dashed var(--line);background:#faf6ff;border-radius:12px;margin-bottom:6px">
+    return `<div class="row between appt-row" data-name="${esc((a.clientName || '').toLowerCase())}" style="padding:12px;border-bottom:1px dashed var(--line);background:var(--tint-2);border-radius:12px;margin-bottom:6px">
       <div class="row" style="gap:12px"><span class="cli-av" style="background:${avColor(a.clientName)}">${initials(a.clientName)}</span>
-        <div><b>${a.time}</b> · ${esc(a.clientName)} <span class="tag-cat" style="background:var(--tint);color:#7c3aed">⏳ pedido pelo link</span><div class="muted" style="font-size:13px">${esc(a.serviceName)} · ${fmt(a.price)}${a.phone ? ' · 📞 ' + esc(a.phone) : ''}</div></div></div>
+        <div><b>${a.time}</b> · ${esc(a.clientName)} <span class="tag-cat" style="background:var(--tint);color:var(--violet)">⏳ pedido pelo link</span><div class="muted" style="font-size:13px">${esc(a.serviceName)} · ${fmt(a.price)}${a.phone ? ' · 📞 ' + esc(a.phone) : ''}</div></div></div>
       <div class="row appt-acts">
         <button class="btn btn-sm btn-primary" data-act="accept-appt" data-id="${a.id}">✅ Aceitar</button>
         <button class="modal-x" data-act="cancel-appt" data-id="${a.id}" title="Recusar">×</button>
@@ -959,7 +1002,7 @@ function apptRow(a) {
   const msgConfirmar = `Oi ${first}! ✨ Passando pra confirmar seu horário na ${biz}: ${a.serviceName} no dia ${dataBR} às ${a.time}. Posso confirmar? 😊`;
   const msgLembrar = `Oi ${first}! 💜 Lembrete do seu horário na ${biz}: ${a.serviceName} dia ${dataBR} às ${a.time}. Te espero! ✨`;
   const noTel = phone ? '' : ' title="Cliente sem telefone — o WhatsApp vai abrir pra você escolher o contato"';
-  return `<div class="row between appt-row" style="padding:12px 0;border-bottom:1px dashed var(--line)">
+  return `<div class="row between appt-row" data-name="${esc((a.clientName || '').toLowerCase())}" style="padding:12px 0;border-bottom:1px dashed var(--line)">
     <div class="row" style="gap:12px"><span class="cli-av" style="background:${avColor(a.clientName)}">${initials(a.clientName)}</span>
       <div><b>${a.time}</b> · ${esc(a.clientName)}${phone ? '' : ' <span class="tag-cat" style="background:#fff1dc;color:#b9770f">sem tel.</span>'}<div class="muted" style="font-size:13px">${esc(a.serviceName)} · ${fmt(a.price)}</div></div></div>
     <div class="row appt-acts">
@@ -1451,6 +1494,7 @@ function fillThemeSwatches(sel, opts) {
   box.innerHTML = themeSwatchesHTML(savedThemePref() || (state && state.business && state.business.theme) || 'fem');
   box.querySelectorAll('.tsw').forEach(b => b.onclick = () => {
     applyTheme(b.dataset.t);   // aplica + sincroniza o .on de TODOS os swatches (ver applyTheme)
+    const w = b.closest('#sbThemeWrap'); if (w) { w.classList.remove('open'); const tg = w.querySelector('#sbThemeToggle'); if (tg) tg.setAttribute('aria-expanded', 'false'); }
     try { localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
     const note = document.querySelector('#authThemeNote'); if (note) note.classList.remove('first');
     if (opts.persist && state && state.business) { state.business.theme = b.dataset.t; save(); }   // conta logada: grava a cor na hora
@@ -1485,6 +1529,7 @@ function applyTheme(force) {
     if (el.textContent !== want) el.textContent = want;
   });
   document.querySelectorAll('.tsw[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  const snm = document.querySelector('#sbThemeName'); if (snm) snm.textContent = themeName(t);   // nome da cor no atalho da sidebar
   // PWA: a cor da barra do sistema (app instalado) acompanha o tema (rosa/azul/verde)
   const tc = document.querySelector('meta[name="theme-color"]');
   if (tc) tc.setAttribute('content', THEME_COLOR[t] || THEME_COLOR.fem);
@@ -3035,6 +3080,8 @@ function demoSignup() {
 document.addEventListener('DOMContentLoaded', async () => {
   applyTheme(savedThemePref() || 'fem');   // reflete o tema escolhido já na landing/login
   fillThemeSwatches('#sbTheme', { persist: true, toast: true });   // atalho de cor na barra lateral (conta logada)
+  { const tg = document.querySelector('#sbThemeToggle'), wr = document.querySelector('#sbThemeWrap');
+    if (tg && wr) tg.onclick = () => { const open = wr.classList.toggle('open'); tg.setAttribute('aria-expanded', open ? 'true' : 'false'); }; }
   document.querySelectorAll('#lpTheme .tsw').forEach(b => b.onclick = () => {
     applyTheme(b.dataset.t);
     try { localStorage.setItem(THEME_CHOSEN_KEY, '1'); } catch (e) {}
