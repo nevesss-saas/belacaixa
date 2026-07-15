@@ -890,16 +890,36 @@ VIEWS.clientes = {
 
     <div class="card mt">
       <p class="muted" style="margin-bottom:14px">💡 Toda vez que você registra um atendimento com um nome novo, a cliente é <b>cadastrada automaticamente</b> aqui.</p>
+      ${total ? `<div class="ag-search" style="margin-bottom:14px"><span class="ag-search-ico">🔍</span><input type="text" id="cliSearch" class="input" placeholder="Buscar cliente por nome ou telefone…" autocomplete="off" spellcheck="false"><button type="button" class="ag-search-clear" id="cliSearchClear" title="Limpar busca" hidden>×</button></div>` : ''}
       <div class="tbl-wrap"><table class="tbl">
         <thead><tr><th>Cliente</th><th>Telefone</th><th class="num">Visitas</th><th class="num">Total gasto</th><th>Última visita</th><th></th></tr></thead>
-        <tbody>${rows.map(({ c, s }) => `<tr>
+        <tbody>${rows.map(({ c, s }) => `<tr data-name="${esc((c.name + ' ' + (c.phone || '')).toLowerCase())}">
           <td><div class="row" style="gap:10px"><span class="cli-av" style="background:${avColor(c.name)}">${initials(c.name)}</span><b>${esc(c.name)}</b>${s.visits >= 3 ? '<span class="badge b-violet">fiel</span>' : ''}</div></td>
           <td class="muted">${esc(c.phone || '—')}</td>
           <td class="num">${s.visits}</td><td class="num">${fmt(s.total)}</td>
           <td class="muted">${s.last ? fmtDateFull(s.last) : '—'}</td>
-          <td class="num" style="white-space:nowrap"><button class="modal-x" data-act="edit-cliente" data-id="${c.id}" title="Editar cliente">✏️</button><button class="modal-x" data-act="del-cliente" data-id="${c.id}" title="Excluir">🗑️</button></td></tr>`).join('')}</tbody>
+          <td class="num" style="white-space:nowrap"><button class="modal-x" data-act="edit-cliente" data-id="${c.id}" title="Editar cliente">✏️</button><button class="modal-x" data-act="del-cliente" data-id="${c.id}" title="Excluir">🗑️</button></td></tr>`).join('')}
+          <tr id="cliNoRes" hidden><td colspan="6"><div class="empty" style="padding:22px"><span class="e-ico">🔍</span>Nenhum cliente encontrado com esse nome ou telefone.</div></td></tr></tbody>
       </table></div>
     </div>`;
+  },
+  init() {
+    // busca por nome ou telefone: esconde as linhas que não batem
+    const inp = document.querySelector('#cliSearch'), clr = document.querySelector('#cliSearchClear'), noRes = document.querySelector('#cliNoRes');
+    if (!inp) return;
+    const apply = () => {
+      const q = inp.value.trim().toLowerCase();
+      if (clr) clr.hidden = !q;
+      let vis = 0;
+      document.querySelectorAll('#viewRoot .tbl tbody tr[data-name]').forEach(tr => {
+        const show = !q || (tr.dataset.name || '').includes(q);
+        tr.style.display = show ? '' : 'none';
+        if (show) vis++;
+      });
+      if (noRes) noRes.hidden = !(q && !vis);
+    };
+    inp.oninput = apply;
+    if (clr) clr.onclick = () => { inp.value = ''; apply(); inp.focus(); };
   }
 };
 function miniStat(ico, label, val) { return `<div class="kpi" style="padding:14px"><div class="row" style="gap:10px"><span style="font-size:20px">${ico}</span><div><div class="kpi-label" style="margin:0">${label}</div><div class="kpi-value" style="font-size:20px">${val}</div></div></div></div>`; }
