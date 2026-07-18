@@ -867,7 +867,8 @@ VIEWS.financeiro = {
 function txRow(t) {
   const cli = t.clientId ? state.clients.find(c => c.id === t.clientId) : null;
   const payTag = t.pay ? `<span class="pay-ic" title="${PAY_LABEL[t.pay] || ''}">${payIcon(t.pay)}</span>` : '';
-  const feeTag = t.feeAdded ? ` <span class="muted" style="font-size:11px">(+${t.feePct}% maq.)</span>` : '';
+  const feeTag = t.feeAdded ? ` <span class="muted" style="font-size:11px">(+${t.feePct}% maq. repassada)</span>`
+    : (t.feeNet ? ` <span class="muted" style="font-size:11px">(líquido, −${t.feePct}% maq.)</span>` : '');
   return `<tr><td class="muted">${fmtDateFull(t.date)}</td><td>${payTag}${esc(t.desc)}${feeTag}</td><td><span class="tag-cat">${esc(t.category)}</span></td><td>${cli ? esc(cli.name.split(' ')[0]) : '—'}</td>
     <td class="num ${t.type === 'in' ? 't-in' : 't-out'}">${t.type === 'in' ? '+' : '−'} ${fmt(t.amount)}</td>
     <td class="num" style="white-space:nowrap"><button class="modal-x" data-act="edit-tx" data-id="${t.id}" title="Editar lançamento">✏️</button><button class="modal-x" data-act="del-tx" data-id="${t.id}" title="Excluir">🗑️</button></td></tr>`;
@@ -1790,8 +1791,8 @@ function modalAtendimento() {
     if (!fee) { box.innerHTML = ''; return; }
     const feeAmt = val * fee / 100;
     box.innerHTML = $('#pay_fee_add').checked
-      ? `➕ Total com a taxa: <b>${fmt(val + feeAmt)}</b> <span class="muted">(${fmt(val)} + ${fee}%)</span>`
-      : `💳 A maquininha desconta ~${fmt(feeAmt)} — você recebe <b>${fmt(val - feeAmt)}</b>`;
+      ? `➕ Cliente paga <b>${fmt(val + feeAmt)}</b> <span class="muted">(${fmt(val)} + ${fee}%)</span> — é o que entra no caixa`
+      : `💳 A maquininha desconta ~${fmt(feeAmt)} — entra no caixa o líquido: <b>${fmt(val - feeAmt)}</b>`;
   };
   const selPay = (id) => {
     payMethod = id;
@@ -1821,7 +1822,12 @@ function modalAtendimento() {
         state.business.cardFees = state.business.cardFees || {};
         state.business.cardFees[payMethod] = fee;         // vira o padrão da próxima vez
         extra.feePct = fee;
-        if ($('#pay_fee_add').checked) { amount = +(val + val * fee / 100).toFixed(2); extra.feeAdded = true; }
+        const feeAmt = +(val * fee / 100).toFixed(2);
+        if ($('#pay_fee_add').checked) {
+          amount = +(val + feeAmt).toFixed(2); extra.feeAdded = true;   // repassa ao cliente: ele paga val+taxa
+        } else {
+          amount = +(val - feeAmt).toFixed(2); extra.feeNet = true;     // maquininha desconta: entra no caixa o LÍQUIDO (bate com a prévia)
+        }
       }
     }
     state.transactions.push({ id: uid(), type: 'in', category: 'Atendimentos', amount, desc: servName + ' — ' + name.split(' ')[0], date: $('#f_date').value, clientId: cli.id, ...extra });
